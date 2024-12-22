@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mirror.is - Instant Text Sharing</title>
+    <meta name="description" content="Share text instantly with devices on your network. No signup, no installation - just open and share.">
+    <style>
+        :root {
+            --primary-color: #2D3748;
+            --accent-color: #4299E1;
+            --background-color: #F7FAFC;
+            --text-color: #1A202C;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+        }
+        
+        .logo {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .tagline {
+            font-size: 1.5rem;
+            color: var(--text-color);
+            margin-bottom: 2rem;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 4rem 0;
+        }
+        
+        .feature {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .logo {
+                font-size: 2.5rem;
+            }
+            
+            .tagline {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <div class="logo">mirror.is</div>
+            <h1 class="tagline">Share text instantly with nearby devices</h1>
+            <a href="https://mirror.is" class="cta-button">Start Sharing</a>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h3>🚀 Instant Sharing</h3>
+                <p>Share text between devices instantly. No signup, no installation - just open and share.</p>
+            </div>
+            <div class="feature">
+                <h3>🌐 Network Based</h3>
+                <p>Works with any devices on the same network. Perfect for quick sharing between your phone, tablet, and computer.</p>
+            </div>
+            <div class="feature">
+                <h3>🔒 Privacy First</h3>
+                <p>Content is temporary and only accessible to devices on your network. No permanent storage.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>
+            <a href="https://github.com/harmonyinfotech/mirror">View on GitHub</a> •
+            Made with ♥ by <a href="https://github.com/harmonyinfotech">Harmony Infotech</a>
+        </p>
+    </footer>
+</body>
+</html>
