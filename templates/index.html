@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mirror.is - Instant Text Sharing Within Your Network</title>
+    <meta name="description" content="Share text instantly with devices on your network. No signup required, just type and share.">
+    <style>
+        :root {
+            --primary-color: #2D3748;
+            --secondary-color: #4A5568;
+            --accent-color: #4299E1;
+            --background-color: #F7FAFC;
+            --text-color: #1A202C;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+            letter-spacing: -1px;
+        }
+        
+        .tagline {
+            font-size: 1.1rem;
+            color: var(--secondary-color);
+            margin: 0.5rem 0;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+        
+        .content-area {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .ad-sidebar {
+            align-self: start;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .ad-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        textarea {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            resize: vertical;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+        }
+        
+        .success { background-color: #dff0d8; color: #3c763d; }
+        .error { background-color: #f2dede; color: #a94442; }
+        
+        .info {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            margin-top: 10px;
+        }
+        
+        .disclaimer {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 6px;
+            color: #856404;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+        
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .ad-sidebar {
+                position: static;
+                margin-top: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="logo">mirror.is</a>
+        <p class="tagline">Share text instantly with nearby devices</p>
+    </div>
+
+    <div class="main-container">
+        <div class="content-area">
+            <textarea id="content" placeholder="Type or paste your content here... It will automatically sync with other devices on your network"></textarea>
+            
+            <div class="info">Content automatically syncs every 2 seconds</div>
+            <div id="status" class="status"></div>
+            
+            <div class="disclaimer">
+                ⚠️ Security Notice: This is a simple text sharing tool for convenience. Please do not share sensitive information 
+                like passwords, secret keys, or personal data. Content is stored temporarily and shared with anyone on the same network.
+            </div>
+        </div>
+        
+        <div class="ad-sidebar">
+            <div class="ad-container">
+                <script>
+                    var cpmstar_rnd = Math.round(Math.random()*999999);
+                    var cpmstar_pid = 35452;
+                    var cpmstar_subpid = 0;
+                    document.writeln("<SCR"+"IPT language='Javascript' src='//server.cpmstar.com/view.aspx?poolid="+cpmstar_pid+"&script=1&rnd="+cpmstar_rnd+"&subpoolid="+cpmstar_subpid+"'></SCR"+"IPT>");
+                </script>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>
+            <a href="https://github.com/yourusername/mirror-is" target="_blank">GitHub</a> • 
+            <a href="/privacy">Privacy</a> • 
+            <a href="/about">About</a>
+        </p>
+        <p> 2024 mirror.is - Made with  for the web</p>
+    </footer>
+
+    <script>
+        let lastContent = '';
+        let typingTimer;
+        const doneTypingInterval = 500;
+        
+        const textarea = document.getElementById('content');
+        
+        async function saveContent() {
+            const content = textarea.value;
+            if (content === lastContent) return;
+            
+            lastContent = content;
+            try {
+                const response = await fetch('/api/content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content }),
+                });
+                
+                if (!response.ok) {
+                    showStatus('Failed to save content.', 'error');
+                }
+            } catch (error) {
+                showStatus('Error saving content: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshContent() {
+            try {
+                const response = await fetch('/api/content');
+                const data = await response.json();
+                
+                if (data.content !== lastContent) {
+                    textarea.value = data.content;
+                    lastContent = data.content;
+                }
+            } catch (error) {
+                showStatus('Error refreshing content: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        textarea.addEventListener('input', () => {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(saveContent, doneTypingInterval);
+        });
+
+        setInterval(refreshContent, 2000);
+        refreshContent();
+    </script>
+</body>
+</html>
