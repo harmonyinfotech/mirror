@@ -121,7 +121,7 @@ def index():
     network = get_ip_network(ip)
     update_analytics(network)
     stats = get_analytics()
-    return render_template('index.html', stats=stats)
+    return render_template('index.html', stats=stats, version=VERSION)
 
 @app.route('/api/content', methods=['GET', 'POST'])
 def handle_content():
