@@ -101,6 +101,13 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
+        .editor-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
         .ad-sidebar {
             align-self: start;
             position: sticky;
@@ -262,7 +269,8 @@
     </div>
 
     <div class="main-container">
-        <div class="content-area">
+        <div class="editor-container">
+            <textarea id="content" placeholder="Type or paste your content here... It will automatically sync with other devices on your network"></textarea>
             <div class="button-group">
                 <button class="action-button" onclick="pasteFromClipboard()" title="Paste from clipboard">
                     📋 Paste
@@ -274,8 +282,6 @@
                     🗑️ Clear
                 </button>
             </div>
-            <textarea id="content" placeholder="Type or paste your content here... It will automatically sync with other devices on your network"></textarea>
-            
             <div class="info">Content automatically syncs every 2 seconds</div>
             <div id="status" class="status"></div>
             
@@ -313,6 +319,8 @@
         let typingTimer;
         const doneTypingInterval = 500;
         let isTyping = false;
+        let lastTypingTime = 0;
+        const typingDelay = 2000;
         
         const textarea = document.getElementById('content');
         const STORAGE_KEY = 'mirror_content';
@@ -508,13 +516,46 @@
         
         textarea.addEventListener('input', () => {
             isTyping = true;
+            lastTypingTime = Date.now();
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
-                isTyping = false;
-                saveContent();
-            }, doneTypingInterval);
+                syncContent();
+            }, typingDelay);
         });
 
+        function syncContent() {
+            if (!isTyping || (Date.now() - lastTypingTime > typingDelay)) {
+                const content = textarea.value;
+                
+                // Only sync if content has changed
+                if (content !== lastContent) {
+                    fetch('/sync', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: content,
+                            version: currentVersion
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            currentVersion = data.version;
+                            lastContent = content;
+                            saveContent();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                }
+                
+                isTyping = false;
+            }
+        }
+        
         // Load stored content first, then refresh from server
         if (!loadStoredContent()) {
             refreshContent();

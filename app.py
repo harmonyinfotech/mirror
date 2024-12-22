@@ -66,11 +66,9 @@ def update_analytics(network, ip, chars=0, is_sync=False, is_pageview=False):
         analytics['daily_stats'][today]['visits'] += 1
         analytics['active_networks'].add(network)
         
-        if is_sync:
+        if is_sync and chars > 0:  # Only update sync stats if there are characters
             analytics['total_syncs'] += 1
             analytics['daily_stats'][today]['syncs'] += 1
-        
-        if chars > 0:
             analytics['total_chars_shared'] += chars
             analytics['daily_stats'][today]['chars'] += chars
 
@@ -205,6 +203,49 @@ def handle_content():
             'content': '',
             'version': 0,
             'has_update': False
+        })
+
+@app.route('/sync', methods=['POST'])
+def sync():
+    """Sync content between devices"""
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        client_version = data.get('version', 0)
+        ip = get_public_ip()
+        network = get_ip_network(ip)
+        
+        # Initialize network content if needed
+        if network not in shared_content:
+            shared_content[network] = ContentVersion()
+        
+        # Check version to prevent overwrites
+        if client_version >= shared_content[network].version:
+            # Calculate character difference for analytics
+            prev_content = shared_content[network].content
+            char_diff = abs(len(content) - len(prev_content)) if prev_content else len(content)
+            
+            # Only update analytics if content actually changed
+            if content != prev_content:
+                update_analytics(network, ip, char_diff, True)
+            
+            shared_content[network].content = content
+            shared_content[network].version = client_version + 1
+            shared_content[network].last_updated = datetime.now()
+            
+            return jsonify({
+                'status': 'success',
+                'version': shared_content[network].version
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Version mismatch'
+            })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         })
 
 @app.route('/about')
