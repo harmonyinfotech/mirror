@@ -169,6 +169,61 @@
             text-decoration: underline;
         }
         
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        
+        .action-button {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            background: var(--accent-color);
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        
+        .action-button:hover {
+            background: #357ABD;
+        }
+        
+        .action-button:active {
+            background: #2563EB;
+        }
+        
+        .action-button.secondary {
+            background: var(--secondary-color);
+        }
+        
+        .action-button.secondary:hover {
+            background: #64748B;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            background: var(--primary-color);
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
         @media (max-width: 768px) {
             .main-container {
                 grid-template-columns: 1fr;
@@ -195,6 +250,17 @@
 
     <div class="main-container">
         <div class="content-area">
+            <div class="button-group">
+                <button class="action-button" onclick="pasteFromClipboard()" title="Paste from clipboard">
+                    📋 Paste
+                </button>
+                <button class="action-button" onclick="copyToClipboard()" title="Copy to clipboard">
+                    📝 Copy
+                </button>
+                <button class="action-button secondary" onclick="clearContent()" title="Clear content">
+                    🗑️ Clear
+                </button>
+            </div>
             <textarea id="content" placeholder="Type or paste your content here... It will automatically sync with other devices on your network"></textarea>
             
             <div class="info">Content automatically syncs every 2 seconds</div>
@@ -217,6 +283,8 @@
             </div>
         </div>
     </div>
+
+    <div id="toast" class="toast"></div>
 
     <footer class="footer">
         <p>
@@ -332,6 +400,99 @@
             }, 3000);
         }
 
+        function showToast(message, duration = 2000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+        
+        async function copyToClipboard() {
+            const content = textarea.value;
+            try {
+                await navigator.clipboard.writeText(content);
+                showToast('Copied to clipboard! 📋');
+            } catch (err) {
+                showToast('Failed to copy: ' + err.message);
+            }
+        }
+        
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                textarea.value = text;
+                lastContent = text;
+                saveContent();
+                showToast('Pasted from clipboard! 📝');
+            } catch (err) {
+                showToast('Failed to paste: ' + err.message);
+            }
+        }
+        
+        function clearContent() {
+            if (confirm('Are you sure you want to clear the content?')) {
+                textarea.value = '';
+                lastContent = '';
+                saveContent();
+                showToast('Content cleared! 🗑️');
+            }
+        }
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Check if Ctrl/Cmd key is pressed
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                switch(e.key.toLowerCase()) {
+                    case 'v':
+                        e.preventDefault();
+                        pasteFromClipboard();
+                        break;
+                    case 'c':
+                        e.preventDefault();
+                        copyToClipboard();
+                        break;
+                }
+            }
+        });
+        
+        // Handle paste event
+        textarea.addEventListener('paste', (e) => {
+            // The input event will handle the content update
+            showToast('Content pasted! 📋');
+        });
+        
+        // Add drag and drop support
+        textarea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            textarea.classList.add('dragover');
+        });
+        
+        textarea.addEventListener('dragleave', () => {
+            textarea.classList.remove('dragover');
+        });
+        
+        textarea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            textarea.classList.remove('dragover');
+            
+            if (e.dataTransfer.items) {
+                for (let item of e.dataTransfer.items) {
+                    if (item.kind === 'string' && item.type === 'text/plain') {
+                        item.getAsString((text) => {
+                            textarea.value = text;
+                            lastContent = text;
+                            saveContent();
+                            showToast('Content dropped! 📄');
+                        });
+                        break;
+                    }
+                }
+            }
+        });
+        
         textarea.addEventListener('input', () => {
             isTyping = true;
             clearTimeout(typingTimer);
