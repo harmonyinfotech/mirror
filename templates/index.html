@@ -186,7 +186,8 @@
         <a href="/" class="logo">mirror.is</a>
         <p class="tagline">Share text instantly with nearby devices</p>
         <div class="stats">
-            <span title="Active Networks">🌐 {{ stats.active_networks }}</span>
+            <span title="Today's Pageviews">👁️ {{ stats.today_pageviews }}</span>
+            <span title="Today's Unique Visitors">👤 {{ stats.today_unique_visitors }}</span>
             <span title="Today's Syncs">🔄 {{ stats.today_syncs }}</span>
             <span title="Characters Shared Today">📝 {{ '{:,}'.format(stats.today_chars) }}</span>
         </div>
@@ -233,6 +234,39 @@
         let isTyping = false;
         
         const textarea = document.getElementById('content');
+        const STORAGE_KEY = 'mirror_content';
+        
+        // Load content from localStorage on page load
+        function loadStoredContent() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    if (data && data.content && data.version) {
+                        textarea.value = data.content;
+                        lastContent = data.content;
+                        currentVersion = data.version;
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading stored content:', error);
+            }
+            return false;
+        }
+        
+        // Save content to localStorage
+        function saveToStorage(content, version) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    content,
+                    version,
+                    timestamp: Date.now()
+                }));
+            } catch (error) {
+                console.error('Error saving to storage:', error);
+            }
+        }
         
         async function saveContent() {
             const content = textarea.value;
@@ -254,12 +288,14 @@
                 const data = await response.json();
                 if (data.status === 'success') {
                     currentVersion = data.version;
+                    saveToStorage(data.content, data.version);
                 } else if (data.status === 'outdated') {
                     // Our version is behind, update the content
                     if (!isTyping) {
                         textarea.value = data.content;
                         lastContent = data.content;
                         currentVersion = data.version;
+                        saveToStorage(data.content, data.version);
                     }
                 }
             } catch (error) {
@@ -278,6 +314,7 @@
                     textarea.value = data.content;
                     lastContent = data.content;
                     currentVersion = data.version;
+                    saveToStorage(data.content, data.version);
                 }
             } catch (error) {
                 showStatus('Error refreshing content: ' + error.message, 'error');
@@ -304,8 +341,11 @@
             }, doneTypingInterval);
         });
 
-        // Start with version 0
-        refreshContent();
+        // Load stored content first, then refresh from server
+        if (!loadStoredContent()) {
+            refreshContent();
+        }
+        
         // Refresh every 2 seconds if not typing
         setInterval(refreshContent, 2000);
     </script>

@@ -4,6 +4,7 @@ import json
 import requests
 import ipaddress
 from collections import defaultdict
+import threading
 from version import VERSION, CHANGELOG
 
 app = Flask(__name__)
@@ -14,13 +15,20 @@ analytics = {
     'total_visits': 0,
     'total_syncs': 0,
     'total_chars_shared': 0,
+    'pageviews': 0,
+    'unique_visitors': set(),  # Store IP addresses
     'daily_stats': defaultdict(lambda: {
         'visits': 0,
         'syncs': 0,
-        'chars': 0
+        'chars': 0,
+        'pageviews': 0,
+        'unique_visitors': set()  # Store IP addresses for daily stats
     }),
     'active_networks': set()  # Track unique networks
 }
+
+# Lock for thread-safe operations
+analytics_lock = threading.Lock()
 
 class ContentVersion:
     def __init__(self, content='', version=0):
@@ -39,33 +47,50 @@ def clean_old_content():
     for ip in to_remove:
         del shared_content[ip]
 
-def update_analytics(network, chars=0, is_sync=False):
-    """Update analytics data"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    analytics['total_visits'] += 1
-    analytics['daily_stats'][today]['visits'] += 1
-    analytics['active_networks'].add(network)
-    
-    if is_sync:
-        analytics['total_syncs'] += 1
-        analytics['daily_stats'][today]['syncs'] += 1
-    
-    if chars > 0:
-        analytics['total_chars_shared'] += chars
-        analytics['daily_stats'][today]['chars'] += chars
+def update_analytics(network, ip, chars=0, is_sync=False, is_pageview=False):
+    """Update analytics data thread-safely"""
+    with analytics_lock:
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Update pageviews
+        if is_pageview:
+            analytics['pageviews'] += 1
+            analytics['daily_stats'][today]['pageviews'] += 1
+            
+            # Update unique visitors
+            analytics['unique_visitors'].add(ip)
+            analytics['daily_stats'][today]['unique_visitors'].add(ip)
+        
+        # Update other stats
+        analytics['total_visits'] += 1
+        analytics['daily_stats'][today]['visits'] += 1
+        analytics['active_networks'].add(network)
+        
+        if is_sync:
+            analytics['total_syncs'] += 1
+            analytics['daily_stats'][today]['syncs'] += 1
+        
+        if chars > 0:
+            analytics['total_chars_shared'] += chars
+            analytics['daily_stats'][today]['chars'] += chars
 
 def get_analytics():
-    """Get formatted analytics data"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    return {
-        'total_visits': analytics['total_visits'],
-        'total_syncs': analytics['total_syncs'],
-        'total_chars_shared': analytics['total_chars_shared'],
-        'today_visits': analytics['daily_stats'][today]['visits'],
-        'today_syncs': analytics['daily_stats'][today]['syncs'],
-        'today_chars': analytics['daily_stats'][today]['chars'],
-        'active_networks': len(analytics['active_networks'])
-    }
+    """Get formatted analytics data thread-safely"""
+    with analytics_lock:
+        today = datetime.now().strftime('%Y-%m-%d')
+        return {
+            'total_visits': analytics['total_visits'],
+            'total_syncs': analytics['total_syncs'],
+            'total_chars_shared': analytics['total_chars_shared'],
+            'total_pageviews': analytics['pageviews'],
+            'total_unique_visitors': len(analytics['unique_visitors']),
+            'today_visits': analytics['daily_stats'][today]['visits'],
+            'today_syncs': analytics['daily_stats'][today]['syncs'],
+            'today_chars': analytics['daily_stats'][today]['chars'],
+            'today_pageviews': analytics['daily_stats'][today]['pageviews'],
+            'today_unique_visitors': len(analytics['daily_stats'][today]['unique_visitors']),
+            'active_networks': len(analytics['active_networks'])
+        }
 
 def get_public_ip():
     """Get both IPv4 and IPv6 addresses and return the appropriate one"""
@@ -119,7 +144,7 @@ def get_ip_network(ip):
 def index():
     ip = get_public_ip()
     network = get_ip_network(ip)
-    update_analytics(network)
+    update_analytics(network, ip, is_pageview=True)
     stats = get_analytics()
     return render_template('index.html', stats=stats, version=VERSION)
 
@@ -138,15 +163,20 @@ def handle_content():
         
         # Only update if the client version is newer or equal
         if client_version >= shared_content[network].version:
+            # Only update analytics if content actually changed
+            if content != shared_content[network].content:
+                update_analytics(network, ip, len(content), True)
+            
             shared_content[network].content = content
             shared_content[network].version = client_version + 1
             shared_content[network].last_updated = datetime.now()
             clean_old_content()
-            update_analytics(network, len(content), True)
+            
             print(f"Saved content v{shared_content[network].version} for network {network}: {content[:50]}...")
             return jsonify({
                 'status': 'success',
-                'version': shared_content[network].version
+                'version': shared_content[network].version,
+                'content': content  # Send back content for localStorage
             })
         else:
             # Client is behind, send current version
@@ -179,6 +209,9 @@ def handle_content():
 
 @app.route('/about')
 def about():
+    ip = get_public_ip()
+    network = get_ip_network(ip)
+    update_analytics(network, ip, is_pageview=True)
     stats = get_analytics()
     return render_template('about.html', stats=stats, version=VERSION, changelog=CHANGELOG)
 
