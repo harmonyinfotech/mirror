@@ -200,8 +200,10 @@
 
     <script>
         let lastContent = '';
+        let currentVersion = 0;
         let typingTimer;
         const doneTypingInterval = 500;
+        let isTyping = false;
         
         const textarea = document.getElementById('content');
         
@@ -216,11 +218,22 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content }),
+                    body: JSON.stringify({ 
+                        content,
+                        version: currentVersion
+                    }),
                 });
                 
-                if (!response.ok) {
-                    showStatus('Failed to save content.', 'error');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentVersion = data.version;
+                } else if (data.status === 'outdated') {
+                    // Our version is behind, update the content
+                    if (!isTyping) {
+                        textarea.value = data.content;
+                        lastContent = data.content;
+                        currentVersion = data.version;
+                    }
                 }
             } catch (error) {
                 showStatus('Error saving content: ' + error.message, 'error');
@@ -228,13 +241,16 @@
         }
 
         async function refreshContent() {
+            if (isTyping) return; // Don't refresh while user is typing
+            
             try {
-                const response = await fetch('/api/content');
+                const response = await fetch(`/api/content?version=${currentVersion}`);
                 const data = await response.json();
                 
-                if (data.content !== lastContent) {
+                if (data.has_update && !isTyping) {
                     textarea.value = data.content;
                     lastContent = data.content;
+                    currentVersion = data.version;
                 }
             } catch (error) {
                 showStatus('Error refreshing content: ' + error.message, 'error');
@@ -253,12 +269,18 @@
         }
 
         textarea.addEventListener('input', () => {
+            isTyping = true;
             clearTimeout(typingTimer);
-            typingTimer = setTimeout(saveContent, doneTypingInterval);
+            typingTimer = setTimeout(() => {
+                isTyping = false;
+                saveContent();
+            }, doneTypingInterval);
         });
 
-        setInterval(refreshContent, 2000);
+        // Start with version 0
         refreshContent();
+        // Refresh every 2 seconds if not typing
+        setInterval(refreshContent, 2000);
     </script>
 </body>
 </html>

@@ -21,12 +21,19 @@ analytics = {
     'active_networks': set()  # Track unique networks
 }
 
+class ContentVersion:
+    def __init__(self, content='', version=0):
+        self.content = content
+        self.version = version
+        self.last_updated = datetime.now()
+        self.files = []
+
 def clean_old_content():
     """Remove content older than 24 hours"""
     current_time = datetime.now()
     to_remove = []
     for ip, data in shared_content.items():
-        if current_time - data['last_updated'] > timedelta(hours=24):
+        if current_time - data.last_updated > timedelta(hours=24):
             to_remove.append(ip)
     for ip in to_remove:
         del shared_content[ip]
@@ -123,24 +130,51 @@ def handle_content():
     
     if request.method == 'POST':
         content = request.json.get('content', '')
+        client_version = request.json.get('version', 0)
+        
         if network not in shared_content:
-            shared_content[network] = {'content': '', 'files': [], 'last_updated': datetime.now()}
-        shared_content[network]['content'] = content
-        shared_content[network]['last_updated'] = datetime.now()
-        clean_old_content()
-        update_analytics(network, len(content), True)
-        print(f"Saved content for network {network}: {content[:50]}...")
-        return jsonify({'status': 'success'})
+            shared_content[network] = ContentVersion()
+        
+        # Only update if the client version is newer or equal
+        if client_version >= shared_content[network].version:
+            shared_content[network].content = content
+            shared_content[network].version = client_version + 1
+            shared_content[network].last_updated = datetime.now()
+            clean_old_content()
+            update_analytics(network, len(content), True)
+            print(f"Saved content v{shared_content[network].version} for network {network}: {content[:50]}...")
+            return jsonify({
+                'status': 'success',
+                'version': shared_content[network].version
+            })
+        else:
+            # Client is behind, send current version
+            return jsonify({
+                'status': 'outdated',
+                'content': shared_content[network].content,
+                'version': shared_content[network].version
+            })
     
     elif request.method == 'GET':
+        client_version = request.args.get('version', type=int, default=0)
         if network in shared_content:
-            content = shared_content[network]['content']
-            print(f"Retrieved content for network {network}: {content[:50]}...")
+            content_obj = shared_content[network]
+            # Only send content if there's a newer version
+            if content_obj.version > client_version:
+                return jsonify({
+                    'content': content_obj.content,
+                    'version': content_obj.version,
+                    'has_update': True
+                })
             return jsonify({
-                'content': content,
-                'files': shared_content[network]['files']
+                'has_update': False,
+                'version': content_obj.version
             })
-        return jsonify({'content': '', 'files': []})
+        return jsonify({
+            'content': '',
+            'version': 0,
+            'has_update': False
+        })
 
 @app.route('/about')
 def about():
