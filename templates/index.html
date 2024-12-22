@@ -42,6 +42,15 @@
             margin: 0.5rem 0;
         }
         
+        .stats {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .stats span {
+            margin-right: 1rem;
+        }
+        
         .main-container {
             display: grid;
             grid-template-columns: 1fr 300px;
@@ -149,6 +158,11 @@
     <div class="header">
         <a href="/" class="logo">mirror.is</a>
         <p class="tagline">Share text instantly with nearby devices</p>
+        <div class="stats">
+            <span title="Active Networks">🌐 {{ stats.active_networks }}</span>
+            <span title="Today's Syncs">🔄 {{ stats.today_syncs }}</span>
+            <span title="Characters Shared Today">📝 {{ '{:,}'.format(stats.today_chars) }}</span>
+        </div>
     </div>
 
     <div class="main-container">
@@ -178,8 +192,7 @@
 
     <footer class="footer">
         <p>
-            <a href="https://github.com/yourusername/mirror-is" target="_blank">GitHub</a> • 
-            <a href="/privacy">Privacy</a> • 
+            <a href="https://github.com/harmonyinfotech/mirror" target="_blank">GitHub</a> • 
             <a href="/about">About</a>
         </p>
         <p> 2024 mirror.is - Made with  for the web</p>
