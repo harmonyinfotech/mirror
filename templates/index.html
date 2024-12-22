@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mirror.is - Instant Text Sharing Within Your Network</title>
+    <title>Magic Mirror - Instant Text Sharing</title>
     
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Share text instantly with devices on your network. No signup required, just type and share.">
-    <meta name="keywords" content="text sharing, file sharing, local network, instant sync, clipboard sharing">
+    <meta name="description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
+    <meta name="keywords" content="magic mirror, text sharing, file sharing, local network, instant sync, clipboard sharing">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://mirror.is/">
-    <meta property="og:title" content="mirror.is - Instant Text Sharing Within Your Network">
-    <meta property="og:description" content="Share text instantly with devices on your network. No signup required, just type and share.">
+    <meta property="og:title" content="Magic Mirror - Instant Text Sharing">
+    <meta property="og:description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
     <meta property="og:image" content="https://mirror.is/static/og-image.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://mirror.is/">
-    <meta property="twitter:title" content="mirror.is - Instant Text Sharing Within Your Network">
-    <meta property="twitter:description" content="Share text instantly with devices on your network. No signup required, just type and share.">
+    <meta property="twitter:title" content="Magic Mirror - Instant Text Sharing">
+    <meta property="twitter:description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
     <meta property="twitter:image" content="https://mirror.is/static/og-image.png">
     
     <!-- Favicon -->
@@ -61,12 +61,22 @@
             color: var(--primary-color);
             text-decoration: none;
             letter-spacing: -1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-icon {
+            font-size: 2rem;
         }
         
         .tagline {
             font-size: 1.1rem;
             color: var(--secondary-color);
             margin: 0.5rem 0;
+            text-align: center;
+            font-style: italic;
         }
         
         .stats {
@@ -238,8 +248,11 @@
 </head>
 <body>
     <div class="header">
-        <a href="/" class="logo">mirror.is</a>
-        <p class="tagline">Share text instantly with nearby devices</p>
+        <a href="/" class="logo">
+            <span class="logo-icon">✨</span>
+            Magic Mirror
+        </a>
+        <p class="tagline">Share text magically between devices</p>
         <div class="stats">
             <span title="Today's Pageviews">👁️ {{ stats.today_pageviews }}</span>
             <span title="Today's Unique Visitors">👤 {{ stats.today_unique_visitors }}</span>
@@ -291,7 +304,7 @@
             <a href="https://github.com/harmonyinfotech/mirror" target="_blank">GitHub</a> • 
             <a href="/about">About</a>
         </p>
-        <p> 2024 mirror.is v{{ version }} - Share instantly, sync seamlessly</p>
+        <p> 2024 Magic Mirror v{{ version }} - Share text magically</p>
     </footer>
 
     <script>

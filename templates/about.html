@@ -3,7 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About - mirror.is</title>
+    <title>About Magic Mirror - Instant Text Sharing</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Learn about Magic Mirror - the magical way to share text between devices on your network.">
+    <meta name="keywords" content="magic mirror, about, text sharing, file sharing, local network, instant sync">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mirror.is/about">
+    <meta property="og:title" content="About Magic Mirror - Instant Text Sharing">
+    <meta property="og:description" content="Learn about Magic Mirror - the magical way to share text between devices on your network.">
+    <meta property="og:image" content="https://mirror.is/static/og-image.png">
+    
     <style>
         :root {
             --primary-color: #2D3748;
@@ -34,6 +46,17 @@
             color: var(--primary-color);
             text-decoration: none;
             letter-spacing: -1px;
+        }
+        
+        .logo-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        
+        .tagline {
+            font-size: 1rem;
+            color: var(--secondary-color);
+            margin-top: 0.5rem;
         }
         
         .stats {
@@ -139,7 +162,11 @@
 </head>
 <body>
     <div class="header">
-        <a href="/" class="logo">mirror.is</a>
+        <a href="/" class="logo">
+            <span class="logo-icon">✨</span>
+            Magic Mirror
+        </a>
+        <p class="tagline">Share text magically between devices</p>
     </div>
 
     <div class="stats">
@@ -166,17 +193,17 @@
     </div>
 
     <div class="content">
-        <h1>About mirror.is</h1>
-        <p class="version">Version {{ version }}</p>
+        <h1>About Magic Mirror</h1>
         
-        <p>
-            mirror.is is a simple, fast, and secure way to share text between devices on the same network. 
-            No signup, no installation - just open and share.
+        <p class="intro">
+            Magic Mirror is a simple yet powerful tool that makes text sharing between devices feel magical.
+            No complex setup, no accounts needed - just open the page and watch your text sync instantly
+            across all your devices.
         </p>
 
         <h2>How it Works</h2>
         <p>
-            When you open mirror.is, it automatically detects your network and creates a temporary sharing room. 
+            When you open Magic Mirror, it automatically detects your network and creates a temporary sharing room. 
             Any device on the same network can access this room and see the shared content in real-time.
         </p>
 
@@ -188,7 +215,7 @@
 
         <h2>Open Source</h2>
         <p>
-            mirror.is is open source and available on 
+            Magic Mirror is open source and available on 
             <a href="https://github.com/harmonyinfotech/mirror" target="_blank">GitHub</a>. 
             Feel free to contribute or report issues!
         </p>
@@ -213,7 +240,7 @@
             <a href="/">Home</a> • 
             <a href="https://github.com/harmonyinfotech/mirror">GitHub</a>
         </p>
-        <p> 2024 mirror.is v{{ version }} - Share instantly, sync seamlessly</p>
+        <p>&copy; 2024 Magic Mirror v{{ version }} - Share text magically</p>
     </footer>
 </body>
 </html>

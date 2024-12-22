@@ -1,103 +1,54 @@
-# mirror.is
+# Magic Mirror ✨
 
-Share text instantly with devices on your network. No signup, no installation - just open and share.
+> Share text magically between devices
 
-## Features
+Magic Mirror is a simple yet powerful tool that makes text sharing between devices feel magical. No complex setup, no accounts needed - just open the page and watch your text sync instantly across all your devices.
 
-- Instant text sharing between devices on the same network
-- No account required
-- Real-time synchronization
-- Clean, modern interface
-- Mobile-friendly design
-- Temporary storage (content expires after 24 hours)
+## Features ✨
 
-## Quick Start
+- **Instant Sharing**: Text syncs automatically between devices
+- **No Installation**: Works in any modern browser
+- **No Sign-up**: Just open and start sharing
+- **Network Isolation**: Content only visible to devices on your network
+- **Clipboard Integration**: Quick copy/paste with keyboard shortcuts
+- **Privacy First**: No data stored in the cloud
+- **Real-time Stats**: Track usage and syncs
+- **Open Source**: Free and transparent
 
-1. Clone the repository:
+## How It Works 🪄
+
+1. Open Magic Mirror on your devices
+2. Type or paste your content
+3. Watch it magically appear on all devices
+4. Content expires after 24 hours
+
+## Development 🛠️
+
 ```bash
-git clone https://github.com/yourusername/mirror-is.git
-cd mirror-is
-```
+# Clone the repository
+git clone https://github.com/harmonyinfotech/mirror.git
+cd mirror
 
-2. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-3. Run the application:
-```bash
+# Run the development server
 python app.py
 ```
 
-4. Open in your browser:
-   - Local: `http://localhost:5000`
-   - Other devices: `http://your-ip:5000`
+## Contributing 🤝
 
-## Production Deployment
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Using Gunicorn and Nginx
-
-1. Install Gunicorn:
-```bash
-pip install gunicorn
-```
-
-2. Create a systemd service file `/etc/systemd/system/mirror-is.service`:
-```ini
-[Unit]
-Description=mirror.is text sharing service
-After=network.target
-
-[Service]
-User=your_user
-WorkingDirectory=/path/to/mirror-is
-Environment="PATH=/path/to/venv/bin"
-ExecStart=/path/to/venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 app:app
-
-[Install]
-WantedBy=multi-user.target
-```
-
-3. Configure Nginx:
-```nginx
-server {
-    listen 80;
-    server_name mirror.is;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-4. Start the service:
-```bash
-sudo systemctl start mirror-is
-sudo systemctl enable mirror-is
-```
-
-## Security
-
-- Content is shared with anyone on the same network
-- No encryption in transit (use HTTPS in production)
-- Content expires after 24 hours
-- Do not share sensitive information
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
+## License 📄
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## Acknowledgments 🙏
 
-- Inspired by [ssavr.com](https://ssavr.com)
 - Built with Flask and modern web technologies
+- Made with 💜 for the magical web
+
+---
+
+© 2024 Magic Mirror - Share text magically
