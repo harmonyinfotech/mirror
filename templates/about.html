@@ -90,6 +90,51 @@
             border-top: 1px solid #E2E8F0;
             color: var(--secondary-color);
         }
+        
+        .version {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            margin: 0.5rem 0 1rem 0;
+        }
+        
+        .changelog {
+            margin-top: 2rem;
+        }
+        
+        .release {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        
+        .release:last-child {
+            border-bottom: none;
+        }
+        
+        .release h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .release-date {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            font-weight: normal;
+        }
+        
+        .release ul {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        
+        .release li {
+            margin: 0.3rem 0;
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body>
@@ -118,6 +163,8 @@
 
     <div class="content">
         <h1>About mirror.is</h1>
+        <p class="version">Version {{ version }}</p>
+        
         <p>
             mirror.is is a simple, fast, and secure way to share text between devices on the same network. 
             No signup, no installation - just open and share.
@@ -141,6 +188,20 @@
             <a href="https://github.com/harmonyinfotech/mirror" target="_blank">GitHub</a>. 
             Feel free to contribute or report issues!
         </p>
+
+        <h2>Changelog</h2>
+        <div class="changelog">
+            {% for release in changelog %}
+            <div class="release">
+                <h3>Version {{ release.version }} <span class="release-date">{{ release.date }}</span></h3>
+                <ul>
+                    {% for change in release.changes %}
+                    <li>{{ change }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 
     <div class="footer">
@@ -148,7 +209,7 @@
             <a href="/">Home</a> • 
             <a href="https://github.com/harmonyinfotech/mirror">GitHub</a>
         </p>
-        <p>© 2024 mirror.is - Made with ♥ for the web</p>
+        <p> 2024 mirror.is - Made with for the web</p>
     </div>
 </body>
 </html>

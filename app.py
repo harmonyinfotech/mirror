@@ -4,6 +4,7 @@ import json
 import requests
 import ipaddress
 from collections import defaultdict
+from version import VERSION, CHANGELOG
 
 app = Flask(__name__)
 
@@ -179,7 +180,7 @@ def handle_content():
 @app.route('/about')
 def about():
     stats = get_analytics()
-    return render_template('about.html', stats=stats)
+    return render_template('about.html', stats=stats, version=VERSION, changelog=CHANGELOG)
 
 @app.route('/api/stats')
 def stats():
