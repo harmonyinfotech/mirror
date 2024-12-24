@@ -313,8 +313,8 @@
             <span>Today's Views: {{ analytics.daily_views }}</span>
         </div>
         <div class="connection-info">
-            <span class="connection-status" id="connection-status"></span>
-            <span class="connection-text" id="connection-text">Connecting...</span>
+            <span class="connection-status connected"></span>
+            <span class="connection-text">Connected</span>
         </div>
         <div class="footer-links">
             <a href="/about">About</a>
@@ -332,7 +332,8 @@
     <script>
         let pollInterval;
         const POLL_INTERVAL = 1000; // Poll every second
-        let lastContent = ''; // Track last known content
+        let lastContent = '{{ content }}'; // Initialize with server content
+        let isTyping = false;
         
         function startPolling() {
             // Initial poll
@@ -343,12 +344,14 @@
         }
         
         function pollContent() {
+            if (isTyping) return; // Don't poll while user is typing
+            
             fetch('/content')
                 .then(response => response.json())
                 .then(data => {
                     const textarea = document.getElementById('content');
-                    // Only update if content has changed and is different from what user typed
-                    if (data.content !== lastContent && data.content !== textarea.value) {
+                    // Only update if content has changed and user isn't typing
+                    if (data.content !== lastContent && !isTyping) {
                         const start = textarea.selectionStart;
                         const end = textarea.selectionEnd;
                         textarea.value = data.content;
@@ -366,7 +369,11 @@
                     document.querySelector('.stats span:nth-child(2)').textContent = `Online Devices: ${data.analytics.online_devices}`;
                     document.querySelector('.stats span:nth-child(3)').textContent = `Today's Views: ${data.analytics.daily_views}`;
                 })
-                .catch(error => console.error('Error polling content:', error));
+                .catch(error => {
+                    console.error('Error polling content:', error);
+                    document.querySelector('.connection-status').classList.remove('connected');
+                    document.querySelector('.connection-text').textContent = 'Disconnected';
+                });
         }
         
         // Handle text changes
@@ -375,9 +382,12 @@
         
         document.getElementById('content').addEventListener('input', () => {
             const textarea = document.getElementById('content');
+            isTyping = true;
             clearTimeout(typingTimer);
+            
             typingTimer = setTimeout(() => {
-                lastContent = textarea.value; // Update last known content
+                isTyping = false;
+                lastContent = textarea.value;
                 fetch('/content', {
                     method: 'POST',
                     headers: {
@@ -386,6 +396,12 @@
                     body: JSON.stringify({
                         content: textarea.value
                     })
+                }).then(() => {
+                    document.querySelector('.connection-status').classList.add('connected');
+                    document.querySelector('.connection-text').textContent = 'Connected';
+                }).catch(() => {
+                    document.querySelector('.connection-status').classList.remove('connected');
+                    document.querySelector('.connection-text').textContent = 'Disconnected';
                 });
             }, TYPING_DELAY);
         });

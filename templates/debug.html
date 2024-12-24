@@ -110,7 +110,7 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3>Python Version</h3>
-                    <p>{{ debug_info.system_info.python_version.split()[0] }}</p>
+                    <p>{{ debug_info.system_info.python_version }}</p>
                 </div>
                 <div class="stat-card">
                     <h3>Platform</h3>
@@ -119,6 +119,18 @@
                 <div class="stat-card">
                     <h3>Server Time</h3>
                     <p>{{ debug_info.system_info.time }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Your IP</h3>
+                    <p>{{ debug_info.system_info.current_ip }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total IPs</h3>
+                    <p>{{ debug_info.system_info.total_ips }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Content Size</h3>
+                    <p>{{ debug_info.system_info.total_content_size }} chars</p>
                 </div>
             </div>
         </div>
@@ -142,17 +154,26 @@
         </div>
         
         <div class="section">
-            <h2>Active Connections</h2>
+            <h2>Active IPs</h2>
+            <div class="log-container">
+                <pre>{% for ip, info in debug_info.active_ips.items() %}{{ ip }} {% if info.is_current_ip %}(You){% endif %}:
+  Content Length: {{ info.content_length }} chars
+  Last Activity: {{ info.last_activity }}
+{% endfor %}</pre>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Memory Usage</h2>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <h3>Total Active Connections</h3>
-                    <p>{{ debug_info.active_connections.total }}</p>
+                    <h3>Content Store Size</h3>
+                    <p>{{ debug_info.memory_usage.content_store }} items</p>
                 </div>
-            </div>
-            <div class="log-container">
-                <pre>Active IPs:
-{% for ip, count in debug_info.active_connections.by_ip.items() %}{{ ip }}: {{ count }} connection(s)
-{% endfor %}</pre>
+                <div class="stat-card">
+                    <h3>Total Characters</h3>
+                    <p>{{ debug_info.memory_usage.total_chars }} chars</p>
+                </div>
             </div>
         </div>
         

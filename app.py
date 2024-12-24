@@ -147,16 +147,46 @@ def generate_qr():
         logger.error(f"QR code generation error: {str(e)}")
         return str(e), 500
 
+@app.route('/about')
+def about():
+    """Show about page"""
+    try:
+        stats = {
+            'total_pageviews': get_analytics()['views'],
+            'total_unique_visitors': get_analytics()['online_devices'],
+            'total_syncs': len(content_by_ip),
+            'total_chars_shared': sum(len(content) for content in content_by_ip.values()),
+            'active_networks': len(content_by_ip)
+        }
+        return render_template('about.html', stats=stats, version=VERSION)
+    except Exception as e:
+        logger.error(f"About page error: {str(e)}")
+        return str(e), 500
+
 @app.route('/debug')
 def debug():
     """Show debug information"""
     try:
         analytics = get_analytics()
+        ip = get_client_ip()
+        
+        # Get active IPs and their content lengths
+        active_ips = {}
+        for ip_addr, content in content_by_ip.items():
+            active_ips[ip_addr] = {
+                'content_length': len(content),
+                'last_activity': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'is_current_ip': ip_addr == ip
+            }
+        
         system_info = {
             'python_version': sys.version.split()[0],
             'platform': sys.platform,
             'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'active_connections': sum(len(clients) for clients in clients_by_ip.values())
+            'current_ip': ip,
+            'total_ips': len(content_by_ip),
+            'total_content_size': sum(len(content) for content in content_by_ip.values()),
+            'uptime': 'N/A'  # TODO: Add server uptime
         }
         
         # Get recent logs
@@ -167,11 +197,12 @@ def debug():
         
         debug_info = {
             'analytics': analytics,
-            'active_connections': {
-                'total': sum(len(clients) for clients in clients_by_ip.values()),
-                'by_ip': {ip: len(clients_list) for ip, clients_list in clients_by_ip.items()}
-            },
-            'system_info': system_info
+            'active_ips': active_ips,
+            'system_info': system_info,
+            'memory_usage': {
+                'content_store': len(content_by_ip),
+                'total_chars': sum(len(content) for content in content_by_ip.values())
+            }
         }
         
         return render_template('debug.html', 
