@@ -33,8 +33,14 @@ logger = app.logger
 VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
 
 # Initialize SQLite database
+db_initialized = False
+
 def init_db():
     """Initialize database with fresh tables"""
+    global db_initialized
+    if db_initialized:
+        return
+    
     try:
         db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
         
@@ -48,24 +54,30 @@ def init_db():
         c = conn.cursor()
         
         # Create tables with correct schema
-        c.execute('''CREATE TABLE analytics
+        c.execute('''CREATE TABLE IF NOT EXISTS analytics
                      (key TEXT PRIMARY KEY,
                       value INTEGER DEFAULT 0)''')
         
-        c.execute('''CREATE TABLE visits
+        c.execute('''CREATE TABLE IF NOT EXISTS visits
                      (ip TEXT,
                       timestamp TEXT,
                       UNIQUE(ip, timestamp))''')
         
         # Initialize default values
-        c.execute('INSERT INTO analytics (key, value) VALUES ("total_views", 0)')
-        c.execute('INSERT INTO analytics (key, value) VALUES ("total_syncs", 0)')
+        c.execute('INSERT OR REPLACE INTO analytics (key, value) VALUES ("total_views", 0)')
+        c.execute('INSERT OR REPLACE INTO analytics (key, value) VALUES ("total_syncs", 0)')
         
         conn.commit()
         conn.close()
         logger.info("Created fresh database with new schema")
+        db_initialized = True
     except Exception as e:
         logger.error(f"Database initialization error: {str(e)}")
+
+@app.before_first_request
+def before_first_request():
+    """Initialize database before first request"""
+    init_db()
 
 def update_analytics(ip):
     """Update analytics data"""
@@ -75,22 +87,13 @@ def update_analytics(ip):
         c = conn.cursor()
         
         # Update total views
-        c.execute('''
-            UPDATE analytics 
-            SET value = value + 1 
-            WHERE key = "total_views"
-        ''')
+        c.execute('UPDATE analytics SET value = value + 1 WHERE key = "total_views"')
         
         # Update daily views
         today = datetime.now().strftime('%Y-%m-%d')
         daily_key = f"daily_views_{today}"
-        c.execute('''
-            UPDATE analytics 
-            SET value = value + 1 
-            WHERE key = ?
-        ''', (daily_key,))
-        if c.rowcount == 0:
-            c.execute('INSERT INTO analytics (key, value) VALUES (?, 1)', (daily_key,))
+        c.execute('INSERT OR REPLACE INTO analytics (key, value) VALUES (?, COALESCE((SELECT value + 1 FROM analytics WHERE key = ?), 1))',
+                 (daily_key, daily_key))
         
         # Record visit
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -98,11 +101,7 @@ def update_analytics(ip):
         
         # Update total syncs when content is updated
         if request and request.endpoint == 'handle_content' and request.method == 'POST':
-            c.execute('''
-                UPDATE analytics 
-                SET value = value + 1 
-                WHERE key = "total_syncs"
-            ''')
+            c.execute('UPDATE analytics SET value = value + 1 WHERE key = "total_syncs"')
         
         conn.commit()
         conn.close()
@@ -161,9 +160,6 @@ def get_analytics():
             'total_unique_visitors': 0,
             'total_syncs': 0
         }
-
-# Initialize database on startup
-init_db()
 
 # In-memory storage
 content_by_ip = {}
