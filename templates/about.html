@@ -59,7 +59,7 @@
             margin-top: 0.5rem;
         }
         
-        .stats {
+        .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
@@ -169,26 +169,31 @@
         <p class="tagline">Share text magically between devices</p>
     </div>
 
-    <div class="stats">
+    <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-number">{{ stats.total_pageviews }}</div>
-            <div class="stat-label">Total Pageviews</div>
+            <h3>Total Page Views</h3>
+            <p>{{ stats.total_pageviews }}</p>
         </div>
         <div class="stat-card">
-            <div class="stat-number">{{ stats.total_unique_visitors }}</div>
-            <div class="stat-label">Unique Visitors</div>
+            <h3>Total Unique Visitors</h3>
+            <p>{{ stats.total_unique_visitors }}</p>
         </div>
         <div class="stat-card">
-            <div class="stat-number">{{ stats.total_syncs }}</div>
-            <div class="stat-label">Text Syncs</div>
+            <h3>Online Users</h3>
+            <p>{{ stats.online_devices }}</p>
         </div>
         <div class="stat-card">
-            <div class="stat-number">{{ '{:,}'.format(stats.total_chars_shared) }}</div>
-            <div class="stat-label">Characters Shared</div>
+            <h3>Active Networks</h3>
+            <p>{{ stats.active_networks }}</p>
+            <small>Networks with content in last 5 minutes</small>
         </div>
         <div class="stat-card">
-            <div class="stat-number">{{ stats.active_networks }}</div>
-            <div class="stat-label">Active Networks</div>
+            <h3>Total Content Syncs</h3>
+            <p>{{ stats.total_syncs }}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Characters Shared</h3>
+            <p>{{ stats.total_chars_shared }}</p>
         </div>
     </div>
 

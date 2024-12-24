@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_file
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import sys
@@ -38,56 +38,106 @@ def init_db():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS analytics
-                 (date TEXT, views INTEGER, unique_users INTEGER)''')
+                 (key TEXT PRIMARY KEY, value INTEGER)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS visits
+                 (ip TEXT, timestamp TEXT)''')
     conn.commit()
     conn.close()
 
 # Update analytics
 def update_analytics(ip):
-    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    today = datetime.now().strftime('%Y-%m-%d')
-    
-    # Get or create today's record
-    c.execute('SELECT * FROM analytics WHERE date = ?', (today,))
-    record = c.fetchone()
-    
-    if record:
-        c.execute('UPDATE analytics SET views = views + 1 WHERE date = ?', (today,))
-    else:
-        c.execute('INSERT INTO analytics (date, views, unique_users) VALUES (?, 1, 0)', (today,))
-    
-    conn.commit()
-    conn.close()
+    """Update analytics data"""
+    with analytics_lock:
+        try:
+            conn = sqlite3.connect('analytics.db')
+            c = conn.cursor()
+            
+            # Create tables if not exist
+            c.execute('''CREATE TABLE IF NOT EXISTS analytics
+                        (key TEXT PRIMARY KEY, value INTEGER)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS visits
+                        (ip TEXT, timestamp TEXT)''')
+            
+            # Update total views
+            c.execute('INSERT OR REPLACE INTO analytics (key, value) '
+                     'SELECT "total_views", COALESCE(value, 0) + 1 FROM analytics WHERE key = "total_views"')
+            if c.rowcount == 0:
+                c.execute('INSERT INTO analytics (key, value) VALUES ("total_views", 1)')
+            
+            # Update daily views
+            today = datetime.now().strftime('%Y-%m-%d')
+            daily_key = f"daily_views_{today}"
+            c.execute('INSERT OR REPLACE INTO analytics (key, value) '
+                     'SELECT ?, COALESCE(value, 0) + 1 FROM analytics WHERE key = ?',
+                     (daily_key, daily_key))
+            if c.rowcount == 0:
+                c.execute('INSERT INTO analytics (key, value) VALUES (?, 1)', (daily_key,))
+            
+            # Record visit
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            c.execute('INSERT INTO visits (ip, timestamp) VALUES (?, ?)', (ip, now))
+            
+            # Update total syncs when content is updated
+            if request.endpoint == 'handle_content' and request.method == 'POST':
+                c.execute('INSERT OR REPLACE INTO analytics (key, value) '
+                         'SELECT "total_syncs", COALESCE(value, 0) + 1 FROM analytics WHERE key = "total_syncs"')
+                if c.rowcount == 0:
+                    c.execute('INSERT INTO analytics (key, value) VALUES ("total_syncs", 1)')
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error updating analytics: {str(e)}")
 
 # Get analytics data
 def get_analytics():
-    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    
-    # Get total views
-    c.execute('SELECT SUM(views) FROM analytics')
-    total_views = c.fetchone()[0] or 0
-    
-    # Get today's views
-    today = datetime.now().strftime('%Y-%m-%d')
-    c.execute('SELECT views FROM analytics WHERE date = ?', (today,))
-    daily_views = c.fetchone()
-    daily_views = daily_views[0] if daily_views else 0
-    
-    # Count unique users (using active clients)
-    unique_users = len(set(clients_by_ip.keys()))
-    
-    conn.close()
-    
-    return {
-        'views': total_views,
-        'unique_users': unique_users,
-        'daily_views': daily_views,
-        'online_devices': sum(len(clients) for clients in clients_by_ip.values())
-    }
+    """Get analytics data"""
+    with analytics_lock:
+        try:
+            conn = sqlite3.connect('analytics.db')
+            c = conn.cursor()
+            
+            # Get total views
+            c.execute('SELECT value FROM analytics WHERE key = "total_views"')
+            total_views = c.fetchone()[0]
+            
+            # Get today's views
+            today = datetime.now().strftime('%Y-%m-%d')
+            c.execute('SELECT value FROM analytics WHERE key = ?', (f"daily_views_{today}",))
+            daily_views = c.fetchone()[0] if c.fetchone() else 0
+            
+            # Get unique devices in last hour
+            hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+            c.execute('SELECT COUNT(DISTINCT ip) FROM visits WHERE timestamp > ?', (hour_ago,))
+            online_devices = c.fetchone()[0]
+            
+            # Get total unique visitors
+            c.execute('SELECT COUNT(DISTINCT ip) FROM visits')
+            total_unique_visitors = c.fetchone()[0]
+            
+            # Get total content syncs (number of content updates)
+            c.execute('SELECT value FROM analytics WHERE key = "total_syncs"')
+            result = c.fetchone()
+            total_syncs = result[0] if result else 0
+            
+            conn.close()
+            
+            return {
+                'views': total_views,
+                'daily_views': daily_views,
+                'online_devices': online_devices,
+                'total_unique_visitors': total_unique_visitors,
+                'total_syncs': total_syncs
+            }
+        except Exception as e:
+            logger.error(f"Error getting analytics: {str(e)}")
+            return {
+                'views': 0,
+                'daily_views': 0,
+                'online_devices': 0,
+                'total_unique_visitors': 0,
+                'total_syncs': 0
+            }
 
 # Initialize database on startup
 init_db()
@@ -183,12 +233,24 @@ def generate_qr():
 def about():
     """Show about page"""
     try:
+        analytics = get_analytics()
+        current_time = datetime.now()
+        
+        # Get active networks (IPs with content in last 5 minutes)
+        active_networks = 0
+        for ip in content_by_ip:
+            if ip in last_update_by_ip:
+                time_diff = (current_time - last_update_by_ip[ip]).total_seconds()
+                if time_diff <= 300:  # 5 minutes
+                    active_networks += 1
+        
         stats = {
-            'total_pageviews': get_analytics()['views'],
-            'total_unique_visitors': get_analytics()['online_devices'],
-            'total_syncs': len(content_by_ip),
+            'total_pageviews': analytics['views'],
+            'total_unique_visitors': analytics['total_unique_visitors'],
+            'total_syncs': analytics['total_syncs'],
             'total_chars_shared': sum(len(content) for content in content_by_ip.values()),
-            'active_networks': len(content_by_ip)
+            'active_networks': active_networks,
+            'online_devices': analytics['online_devices']
         }
         return render_template('about.html', stats=stats, version=VERSION)
     except Exception as e:
