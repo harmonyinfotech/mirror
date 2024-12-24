@@ -188,39 +188,17 @@ def handle_content():
         last_update_by_ip[ip] = datetime.now()
         return jsonify({'status': 'ok'})
     else:
-        # Get all content for this IP's network
-        network_content = {}
-        current_time = datetime.now()
-        
-        for other_ip, content in content_by_ip.items():
-            # Only include content from last 5 minutes
-            if other_ip in last_update_by_ip:
-                time_diff = (current_time - last_update_by_ip[other_ip]).total_seconds()
-                if time_diff <= 300:  # 5 minutes
-                    network_content[other_ip] = {
-                        'content': content,
-                        'length': len(content),
-                        'last_update': last_update_by_ip[other_ip].isoformat()
-                    }
-        
-        # Determine which content to return based on length and recency
+        # Get current content for this IP only
         current_content = content_by_ip.get(ip, '')
-        if network_content:
-            # Sort by content length and recency
-            sorted_content = sorted(
-                network_content.items(),
-                key=lambda x: (x[1]['length'], x[1]['last_update']),
-                reverse=True
-            )
-            
-            # If current content is shorter, use the longest content from network
-            if len(current_content) < sorted_content[0][1]['length']:
-                current_content = sorted_content[0][1]['content']
-        
         return jsonify({
             'content': current_content,
-            'network_content': network_content,
-            'analytics': get_analytics()
+            'network': {
+                ip: {
+                    'content': current_content,
+                    'length': len(current_content),
+                    'last_update': last_update_by_ip[ip].isoformat() if ip in last_update_by_ip else None
+                }
+            }
         })
 
 @app.route('/qr')
