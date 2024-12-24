@@ -11,6 +11,7 @@ import io
 import qrcode
 from PIL import Image
 import sqlite3
+from io import BytesIO
 
 # Initialize logging
 if not os.path.exists('logs'):
@@ -203,24 +204,33 @@ def handle_content():
 
 @app.route('/qr')
 def generate_qr():
-    """Generate QR code for current URL"""
+    """Generate QR code for current content"""
     try:
         ip = get_client_ip()
-        url = f"{request.url_root}?ip={ip}"
+        content = content_by_ip.get(ip, '')
         
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(url)
+        # Create QR code with content
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(content)
         qr.make(fit=True)
-        
+
+        # Create image
         img = qr.make_image(fill_color="black", back_color="white")
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format='PNG')
-        img_buffer.seek(0)
         
-        return send_file(img_buffer, mimetype='image/png')
+        # Save to bytes
+        img_bytes = BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+        
+        return send_file(img_bytes, mimetype='image/png')
     except Exception as e:
-        logger.error(f"QR code generation error: {str(e)}")
-        return str(e), 500
+        logger.error(f"Error generating QR code: {str(e)}")
+        return "Error generating QR code", 500
 
 @app.route('/about')
 def about():

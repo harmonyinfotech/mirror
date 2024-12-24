@@ -165,9 +165,13 @@
             background: #64748B;
         }
         
-        .qr-code {
+        .qr-container {
             text-align: center;
             margin: 20px 0;
+        }
+        
+        .qr-code {
+            margin: 0 auto;
         }
         
         .qr-code img {
@@ -175,6 +179,11 @@
             height: auto;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .qr-help {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
         }
         
         .toast {
@@ -298,9 +307,11 @@
                     document.writeln("<SCR"+"IPT language='Javascript' src='//server.cpmstar.com/view.aspx?poolid="+cpmstar_pid+"&script=1&rnd="+cpmstar_rnd+"'></SCR"+"IPT>");
                 </script>
             </div>
-            <div class="qr-code">
-                <img src="/qr" alt="QR Code" id="qr-code">
-                <p>Scan to share with your phone</p>
+            <div class="qr-container">
+                <div class="qr-code">
+                    <img id="qr-code" src="/qr" alt="QR Code">
+                    <p class="qr-help">Scan this QR code to get the content on another device</p>
+                </div>
             </div>
         </div>
     </div>
