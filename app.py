@@ -33,27 +33,14 @@ logger = app.logger
 VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
 
 # Initialize SQLite database
-db_initialized = False
-
-def init_db():
-    """Initialize database with fresh tables"""
-    global db_initialized
-    if db_initialized:
-        return
-    
+def get_db_connection():
+    """Get database connection and ensure tables exist"""
     try:
         db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-        
-        # Delete existing database if any
-        if os.path.exists(db_path):
-            os.remove(db_path)
-            logger.info("Removed old database")
-        
-        # Create fresh database
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         
-        # Create tables with correct schema
+        # Create tables if they don't exist
         c.execute('''CREATE TABLE IF NOT EXISTS analytics
                      (key TEXT PRIMARY KEY,
                       value INTEGER DEFAULT 0)''')
@@ -63,27 +50,23 @@ def init_db():
                       timestamp TEXT,
                       UNIQUE(ip, timestamp))''')
         
-        # Initialize default values
-        c.execute('INSERT OR REPLACE INTO analytics (key, value) VALUES ("total_views", 0)')
-        c.execute('INSERT OR REPLACE INTO analytics (key, value) VALUES ("total_syncs", 0)')
+        # Initialize default values if they don't exist
+        c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_views", 0)')
+        c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_syncs", 0)')
         
         conn.commit()
-        conn.close()
-        logger.info("Created fresh database with new schema")
-        db_initialized = True
+        return conn
     except Exception as e:
-        logger.error(f"Database initialization error: {str(e)}")
-
-@app.before_first_request
-def before_first_request():
-    """Initialize database before first request"""
-    init_db()
+        logger.error(f"Database connection error: {str(e)}")
+        return None
 
 def update_analytics(ip):
     """Update analytics data"""
     try:
-        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
+        if not conn:
+            return
+            
         c = conn.cursor()
         
         # Update total views
@@ -111,8 +94,16 @@ def update_analytics(ip):
 def get_analytics():
     """Get analytics data"""
     try:
-        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
+        if not conn:
+            return {
+                'views': 0,
+                'daily_views': 0,
+                'online_devices': 0,
+                'total_unique_visitors': 0,
+                'total_syncs': 0
+            }
+            
         c = conn.cursor()
         
         # Get total views
