@@ -34,13 +34,20 @@ VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
 
 # Initialize SQLite database
 def init_db():
-    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-    conn = sqlite3.connect(db_path)
+    """Initialize database"""
+    conn = sqlite3.connect('analytics.db')
     c = conn.cursor()
+    
+    # Create tables if not exist
     c.execute('''CREATE TABLE IF NOT EXISTS analytics
                  (key TEXT PRIMARY KEY, value INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS visits
                  (ip TEXT, timestamp TEXT)''')
+    
+    # Initialize total_views if not exists
+    c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_views", 0)')
+    c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_syncs", 0)')
+    
     conn.commit()
     conn.close()
 
@@ -52,37 +59,45 @@ def update_analytics(ip):
             conn = sqlite3.connect('analytics.db')
             c = conn.cursor()
             
-            # Create tables if not exist
-            c.execute('''CREATE TABLE IF NOT EXISTS analytics
-                        (key TEXT PRIMARY KEY, value INTEGER)''')
-            c.execute('''CREATE TABLE IF NOT EXISTS visits
-                        (ip TEXT, timestamp TEXT)''')
-            
-            # Update total views
-            c.execute('INSERT OR REPLACE INTO analytics (key, value) '
-                     'SELECT "total_views", COALESCE(value, 0) + 1 FROM analytics WHERE key = "total_views"')
-            if c.rowcount == 0:
-                c.execute('INSERT INTO analytics (key, value) VALUES ("total_views", 1)')
+            # Update total views - using INSERT OR REPLACE with COALESCE
+            c.execute('''
+                INSERT OR REPLACE INTO analytics (key, value)
+                VALUES ("total_views", 
+                    COALESCE(
+                        (SELECT value + 1 FROM analytics WHERE key = "total_views"),
+                        1
+                    )
+                )
+            ''')
             
             # Update daily views
             today = datetime.now().strftime('%Y-%m-%d')
             daily_key = f"daily_views_{today}"
-            c.execute('INSERT OR REPLACE INTO analytics (key, value) '
-                     'SELECT ?, COALESCE(value, 0) + 1 FROM analytics WHERE key = ?',
-                     (daily_key, daily_key))
-            if c.rowcount == 0:
-                c.execute('INSERT INTO analytics (key, value) VALUES (?, 1)', (daily_key,))
+            c.execute('''
+                INSERT OR REPLACE INTO analytics (key, value)
+                VALUES (?, 
+                    COALESCE(
+                        (SELECT value + 1 FROM analytics WHERE key = ?),
+                        1
+                    )
+                )
+            ''', (daily_key, daily_key))
             
-            # Record visit
+            # Record visit with timestamp
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             c.execute('INSERT INTO visits (ip, timestamp) VALUES (?, ?)', (ip, now))
             
             # Update total syncs when content is updated
             if request.endpoint == 'handle_content' and request.method == 'POST':
-                c.execute('INSERT OR REPLACE INTO analytics (key, value) '
-                         'SELECT "total_syncs", COALESCE(value, 0) + 1 FROM analytics WHERE key = "total_syncs"')
-                if c.rowcount == 0:
-                    c.execute('INSERT INTO analytics (key, value) VALUES ("total_syncs", 1)')
+                c.execute('''
+                    INSERT OR REPLACE INTO analytics (key, value)
+                    VALUES ("total_syncs", 
+                        COALESCE(
+                            (SELECT value + 1 FROM analytics WHERE key = "total_syncs"),
+                            1
+                        )
+                    )
+                ''')
             
             conn.commit()
             conn.close()
@@ -99,21 +114,25 @@ def get_analytics():
             
             # Get total views
             c.execute('SELECT value FROM analytics WHERE key = "total_views"')
-            total_views = c.fetchone()[0]
+            result = c.fetchone()
+            total_views = result[0] if result else 0
             
             # Get today's views
             today = datetime.now().strftime('%Y-%m-%d')
             c.execute('SELECT value FROM analytics WHERE key = ?', (f"daily_views_{today}",))
-            daily_views = c.fetchone()[0] if c.fetchone() else 0
+            result = c.fetchone()
+            daily_views = result[0] if result else 0
             
             # Get unique devices in last hour
             hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
             c.execute('SELECT COUNT(DISTINCT ip) FROM visits WHERE timestamp > ?', (hour_ago,))
-            online_devices = c.fetchone()[0]
+            result = c.fetchone()
+            online_devices = result[0] if result else 0
             
             # Get total unique visitors
             c.execute('SELECT COUNT(DISTINCT ip) FROM visits')
-            total_unique_visitors = c.fetchone()[0]
+            result = c.fetchone()
+            total_unique_visitors = result[0] if result else 0
             
             # Get total content syncs (number of content updates)
             c.execute('SELECT value FROM analytics WHERE key = "total_syncs"')
@@ -152,11 +171,16 @@ def get_client_ip():
     """Get client IP address"""
     return request.headers.get('X-Real-IP') or request.remote_addr
 
+@app.before_request
+def before_request():
+    """Update analytics before each request"""
+    if not request.path.startswith(('/static/', '/favicon.ico')):
+        update_analytics(get_client_ip())
+
 @app.route('/')
 def index():
     """Render main page"""
     ip = get_client_ip()
-    update_analytics(ip)
     return render_template('index.html', 
                          content=content_by_ip.get(ip, ''),
                          analytics=get_analytics(),
