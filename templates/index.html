@@ -366,8 +366,16 @@
                     const currentLength = textarea.value.length;
                     const newContent = data.content;
                     
-                    // Only update if content has changed
-                    if (newContent !== lastContent && !isTyping) {
+                    // Only update if:
+                    // 1. Content has changed
+                    // 2. User isn't typing
+                    // 3. Either:
+                    //    a. Current content is empty, or
+                    //    b. New content is longer than current content
+                    if (newContent !== lastContent && 
+                        !isTyping && 
+                        (currentLength === 0 || newContent.length > currentLength)) {
+                        
                         const start = textarea.selectionStart;
                         const end = textarea.selectionEnd;
                         textarea.value = newContent;
