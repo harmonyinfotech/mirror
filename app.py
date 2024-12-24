@@ -11,6 +11,7 @@ from geventwebsocket.handler import WebSocketHandler
 import io
 import qrcode
 from PIL import Image
+import sqlite3
 
 # Initialize logging
 if not os.path.exists('logs'):
@@ -29,34 +30,74 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 logger = app.logger
 
+# Initialize SQLite database
+def init_db():
+    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS analytics
+                 (date TEXT, views INTEGER, unique_users INTEGER)''')
+    conn.commit()
+    conn.close()
+
+# Update analytics
+def update_analytics(ip):
+    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    # Get or create today's record
+    c.execute('SELECT * FROM analytics WHERE date = ?', (today,))
+    record = c.fetchone()
+    
+    if record:
+        c.execute('UPDATE analytics SET views = views + 1 WHERE date = ?', (today,))
+    else:
+        c.execute('INSERT INTO analytics (date, views, unique_users) VALUES (?, 1, 0)', (today,))
+    
+    conn.commit()
+    conn.close()
+
+# Get analytics data
+def get_analytics():
+    db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # Get total views
+    c.execute('SELECT SUM(views) FROM analytics')
+    total_views = c.fetchone()[0] or 0
+    
+    # Get today's views
+    today = datetime.now().strftime('%Y-%m-%d')
+    c.execute('SELECT views FROM analytics WHERE date = ?', (today,))
+    daily_views = c.fetchone()
+    daily_views = daily_views[0] if daily_views else 0
+    
+    # Count unique users (using active clients)
+    unique_users = len(set(clients_by_ip.keys()))
+    
+    conn.close()
+    
+    return {
+        'views': total_views,
+        'unique_users': unique_users,
+        'daily_views': daily_views,
+        'online_devices': sum(len(clients) for clients in clients_by_ip.values())
+    }
+
+# Initialize database on startup
+init_db()
+
 # In-memory storage
 content_by_ip = {}
 clients_by_ip = {}
-analytics = {
-    'views': 0,
-    'unique_ips': set(),
-    'daily_stats': {}
-}
 analytics_lock = threading.Lock()
 
 def get_client_ip():
     """Get client IP address"""
     return request.headers.get('X-Real-IP') or request.remote_addr
-
-def update_analytics(ip):
-    """Update analytics data"""
-    with analytics_lock:
-        analytics['views'] += 1
-        analytics['unique_ips'].add(ip)
-        
-        today = datetime.now().strftime('%Y-%m-%d')
-        if today not in analytics['daily_stats']:
-            analytics['daily_stats'][today] = {
-                'views': 0,
-                'unique_ips': set()
-            }
-        analytics['daily_stats'][today]['views'] += 1
-        analytics['daily_stats'][today]['unique_ips'].add(ip)
 
 @app.route('/')
 def index():
@@ -92,6 +133,7 @@ def generate_qr():
 def debug():
     """Show debug information"""
     try:
+        analytics = get_analytics()
         system_info = {
             'python_version': sys.version,
             'platform': sys.platform,
@@ -104,29 +146,26 @@ def debug():
             with open('logs/app.log', 'r') as f:
                 recent_logs = f.readlines()[-50:]  # Last 50 lines
         
+        debug_info = {
+            'analytics': analytics,
+            'active_connections': {
+                'total': sum(len(clients) for clients in clients_by_ip.values()),
+                'by_ip': {ip: len(clients_list) for ip, clients_list in clients_by_ip.items()}
+            },
+            'system_info': {
+                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'content_store_size': len(content_by_ip)
+            }
+        }
+        
         return render_template('debug.html',
                             system_info=system_info,
-                            analytics=get_analytics(),
-                            recent_logs=recent_logs)
+                            analytics=analytics,
+                            recent_logs=recent_logs,
+                            debug_info=debug_info)
     except Exception as e:
         logger.error(f"Debug page error: {str(e)}")
         return str(e), 500
-
-def get_analytics():
-    """Get analytics data"""
-    with analytics_lock:
-        today = datetime.now().strftime('%Y-%m-%d')
-        if today not in analytics['daily_stats']:
-            analytics['daily_stats'][today] = {
-                'views': 0,
-                'unique_ips': set()
-            }
-        return {
-            'views': analytics['views'],
-            'unique_users': len(analytics['unique_ips']),
-            'daily_views': analytics['daily_stats'][today]['views'],
-            'daily_users': len(analytics['daily_stats'][today]['unique_ips'])
-        }
 
 @app.route('/ws')
 def handle_websocket():
