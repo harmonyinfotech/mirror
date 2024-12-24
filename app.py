@@ -1,264 +1,192 @@
-from flask import Flask, render_template, request, jsonify
-from datetime import datetime, timedelta
+from flask import Flask, render_template, request, jsonify, send_file
+from datetime import datetime
 import json
-import requests
-import ipaddress
-from collections import defaultdict
+import os
+import sys
+import logging
 import threading
-from version import VERSION, CHANGELOG
+from logging.handlers import RotatingFileHandler
+from gevent import pywsgi
+from geventwebsocket.handler import WebSocketHandler
+import io
+import qrcode
+from PIL import Image
+
+# Initialize logging
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]',
+    handlers=[
+        RotatingFileHandler('logs/app.log', maxBytes=10000, backupCount=10),
+        logging.StreamHandler()
+    ]
+)
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.urandom(24)
+logger = app.logger
 
-# In-memory storage for shared content and analytics
-shared_content = {}
+# In-memory storage
+content_by_ip = {}
+clients_by_ip = {}
 analytics = {
-    'total_visits': 0,
-    'total_syncs': 0,
-    'total_chars_shared': 0,
-    'pageviews': 0,
-    'unique_visitors': set(),  # Store IP addresses
-    'daily_stats': defaultdict(lambda: {
-        'visits': 0,
-        'syncs': 0,
-        'chars': 0,
-        'pageviews': 0,
-        'unique_visitors': set()  # Store IP addresses for daily stats
-    }),
-    'active_networks': set()  # Track unique networks
+    'views': 0,
+    'unique_ips': set(),
+    'daily_stats': {}
 }
-
-# Lock for thread-safe operations
 analytics_lock = threading.Lock()
 
-class ContentVersion:
-    def __init__(self, content='', version=0):
-        self.content = content
-        self.version = version
-        self.last_updated = datetime.now()
-        self.files = []
+def get_client_ip():
+    """Get client IP address"""
+    return request.headers.get('X-Real-IP') or request.remote_addr
 
-def clean_old_content():
-    """Remove content older than 24 hours"""
-    current_time = datetime.now()
-    to_remove = []
-    for ip, data in shared_content.items():
-        if current_time - data.last_updated > timedelta(hours=24):
-            to_remove.append(ip)
-    for ip in to_remove:
-        del shared_content[ip]
-
-def update_analytics(network, ip, chars=0, is_sync=False, is_pageview=False):
-    """Update analytics data thread-safely"""
+def update_analytics(ip):
+    """Update analytics data"""
     with analytics_lock:
+        analytics['views'] += 1
+        analytics['unique_ips'].add(ip)
+        
         today = datetime.now().strftime('%Y-%m-%d')
-        
-        # Update pageviews
-        if is_pageview:
-            analytics['pageviews'] += 1
-            analytics['daily_stats'][today]['pageviews'] += 1
-            
-            # Update unique visitors
-            analytics['unique_visitors'].add(ip)
-            analytics['daily_stats'][today]['unique_visitors'].add(ip)
-        
-        # Update other stats
-        analytics['total_visits'] += 1
-        analytics['daily_stats'][today]['visits'] += 1
-        analytics['active_networks'].add(network)
-        
-        if is_sync and chars > 0:  # Only update sync stats if there are characters
-            analytics['total_syncs'] += 1
-            analytics['daily_stats'][today]['syncs'] += 1
-            analytics['total_chars_shared'] += chars
-            analytics['daily_stats'][today]['chars'] += chars
-
-def get_analytics():
-    """Get formatted analytics data thread-safely"""
-    with analytics_lock:
-        today = datetime.now().strftime('%Y-%m-%d')
-        return {
-            'total_visits': analytics['total_visits'],
-            'total_syncs': analytics['total_syncs'],
-            'total_chars_shared': analytics['total_chars_shared'],
-            'total_pageviews': analytics['pageviews'],
-            'total_unique_visitors': len(analytics['unique_visitors']),
-            'today_visits': analytics['daily_stats'][today]['visits'],
-            'today_syncs': analytics['daily_stats'][today]['syncs'],
-            'today_chars': analytics['daily_stats'][today]['chars'],
-            'today_pageviews': analytics['daily_stats'][today]['pageviews'],
-            'today_unique_visitors': len(analytics['daily_stats'][today]['unique_visitors']),
-            'active_networks': len(analytics['active_networks'])
-        }
-
-def get_public_ip():
-    """Get both IPv4 and IPv6 addresses and return the appropriate one"""
-    try:
-        # Try IPv6 first
-        response = requests.get('https://api64.ipify.org')
-        if response.status_code == 200:
-            ip = response.text.strip()
-            # Verify if it's a valid IPv6
-            try:
-                ipaddress.IPv6Address(ip)
-                print(f"Using IPv6: {ip}")
-                return ip
-            except ipaddress.AddressValueError:
-                pass
-    except:
-        pass
-
-    try:
-        # Fallback to IPv4
-        response = requests.get('https://api.ipify.org')
-        if response.status_code == 200:
-            ip = response.text.strip()
-            try:
-                ipaddress.IPv4Address(ip)
-                print(f"Using IPv4: {ip}")
-                return ip
-            except ipaddress.AddressValueError:
-                pass
-    except:
-        pass
-    
-    # Final fallback to local detection
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0]
-    return request.remote_addr
-
-def get_ip_network(ip):
-    """Convert IP address to network address for grouping"""
-    try:
-        # For IPv6, group by /64 network
-        if ':' in ip:
-            return str(ipaddress.IPv6Network(f"{ip}/64", strict=False).network_address)
-        # For IPv4, group by /24 network
-        else:
-            return str(ipaddress.IPv4Network(f"{ip}/24", strict=False).network_address)
-    except:
-        return ip
+        if today not in analytics['daily_stats']:
+            analytics['daily_stats'][today] = {
+                'views': 0,
+                'unique_ips': set()
+            }
+        analytics['daily_stats'][today]['views'] += 1
+        analytics['daily_stats'][today]['unique_ips'].add(ip)
 
 @app.route('/')
 def index():
-    ip = get_public_ip()
-    network = get_ip_network(ip)
-    update_analytics(network, ip, is_pageview=True)
-    stats = get_analytics()
-    return render_template('index.html', stats=stats, version=VERSION)
+    """Render main page"""
+    ip = get_client_ip()
+    update_analytics(ip)
+    return render_template('index.html', 
+                         content=content_by_ip.get(ip, ''),
+                         analytics=get_analytics())
 
-@app.route('/api/content', methods=['GET', 'POST'])
-def handle_content():
-    ip = get_public_ip()
-    network = get_ip_network(ip)
-    print(f"IP: {ip}, Network: {network}, Method: {request.method}")
-    
-    if request.method == 'POST':
-        content = request.json.get('content', '')
-        client_version = request.json.get('version', 0)
-        
-        if network not in shared_content:
-            shared_content[network] = ContentVersion()
-        
-        # Only update if the client version is newer or equal
-        if client_version >= shared_content[network].version:
-            # Only update analytics if content actually changed
-            if content != shared_content[network].content:
-                update_analytics(network, ip, len(content), True)
-            
-            shared_content[network].content = content
-            shared_content[network].version = client_version + 1
-            shared_content[network].last_updated = datetime.now()
-            clean_old_content()
-            
-            print(f"Saved content v{shared_content[network].version} for network {network}: {content[:50]}...")
-            return jsonify({
-                'status': 'success',
-                'version': shared_content[network].version,
-                'content': content  # Send back content for localStorage
-            })
-        else:
-            # Client is behind, send current version
-            return jsonify({
-                'status': 'outdated',
-                'content': shared_content[network].content,
-                'version': shared_content[network].version
-            })
-    
-    elif request.method == 'GET':
-        client_version = request.args.get('version', type=int, default=0)
-        if network in shared_content:
-            content_obj = shared_content[network]
-            # Only send content if there's a newer version
-            if content_obj.version > client_version:
-                return jsonify({
-                    'content': content_obj.content,
-                    'version': content_obj.version,
-                    'has_update': True
-                })
-            return jsonify({
-                'has_update': False,
-                'version': content_obj.version
-            })
-        return jsonify({
-            'content': '',
-            'version': 0,
-            'has_update': False
-        })
-
-@app.route('/sync', methods=['POST'])
-def sync():
-    """Sync content between devices"""
+@app.route('/qr')
+def generate_qr():
+    """Generate QR code for current URL"""
     try:
-        data = request.get_json()
-        content = data.get('content', '')
-        client_version = data.get('version', 0)
-        ip = get_public_ip()
-        network = get_ip_network(ip)
+        ip = get_client_ip()
+        url = f"{request.url_root}?ip={ip}"
         
-        # Initialize network content if needed
-        if network not in shared_content:
-            shared_content[network] = ContentVersion()
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(url)
+        qr.make(fit=True)
         
-        # Check version to prevent overwrites
-        if client_version >= shared_content[network].version:
-            # Calculate character difference for analytics
-            prev_content = shared_content[network].content
-            char_diff = abs(len(content) - len(prev_content)) if prev_content else len(content)
-            
-            # Only update analytics if content actually changed
-            if content != prev_content:
-                update_analytics(network, ip, char_diff, True)
-            
-            shared_content[network].content = content
-            shared_content[network].version = client_version + 1
-            shared_content[network].last_updated = datetime.now()
-            
-            return jsonify({
-                'status': 'success',
-                'version': shared_content[network].version
-            })
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': 'Version mismatch'
-            })
+        img = qr.make_image(fill_color="black", back_color="white")
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        return send_file(img_buffer, mimetype='image/png')
     except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        })
+        logger.error(f"QR code generation error: {str(e)}")
+        return str(e), 500
 
-@app.route('/about')
-def about():
-    ip = get_public_ip()
-    network = get_ip_network(ip)
-    update_analytics(network, ip, is_pageview=True)
-    stats = get_analytics()
-    return render_template('about.html', stats=stats, version=VERSION, changelog=CHANGELOG)
+@app.route('/debug')
+def debug():
+    """Show debug information"""
+    try:
+        system_info = {
+            'python_version': sys.version,
+            'platform': sys.platform,
+            'active_connections': sum(len(clients) for clients in clients_by_ip.values())
+        }
+        
+        # Get recent logs
+        recent_logs = []
+        if os.path.exists('logs/app.log'):
+            with open('logs/app.log', 'r') as f:
+                recent_logs = f.readlines()[-50:]  # Last 50 lines
+        
+        return render_template('debug.html',
+                            system_info=system_info,
+                            analytics=get_analytics(),
+                            recent_logs=recent_logs)
+    except Exception as e:
+        logger.error(f"Debug page error: {str(e)}")
+        return str(e), 500
 
-@app.route('/api/stats')
-def stats():
-    return jsonify(get_analytics())
+def get_analytics():
+    """Get analytics data"""
+    with analytics_lock:
+        today = datetime.now().strftime('%Y-%m-%d')
+        if today not in analytics['daily_stats']:
+            analytics['daily_stats'][today] = {
+                'views': 0,
+                'unique_ips': set()
+            }
+        return {
+            'views': analytics['views'],
+            'unique_users': len(analytics['unique_ips']),
+            'daily_views': analytics['daily_stats'][today]['views'],
+            'daily_users': len(analytics['daily_stats'][today]['unique_ips'])
+        }
+
+@app.route('/ws')
+def handle_websocket():
+    """Handle WebSocket connections"""
+    if request.environ.get('wsgi.websocket'):
+        ws = request.environ['wsgi.websocket']
+        ip = get_client_ip()
+        
+        try:
+            # Initialize client list for this IP if needed
+            if ip not in clients_by_ip:
+                clients_by_ip[ip] = set()
+            clients_by_ip[ip].add(ws)
+            
+            logger.info(f"Client connected from IP: {ip}")
+            
+            while True:
+                message = ws.receive()
+                if message is None:
+                    break
+                
+                try:
+                    data = json.loads(message)
+                    content = data.get('content', '')
+                    
+                    # Update content for this IP
+                    content_by_ip[ip] = content
+                    
+                    # Broadcast to all clients with same IP
+                    dead_clients = set()
+                    for client in clients_by_ip[ip]:
+                        try:
+                            if client != ws:  # Don't send back to sender
+                                client.send(json.dumps({'content': content}))
+                        except Exception:
+                            dead_clients.add(client)
+                    
+                    # Clean up dead clients
+                    for client in dead_clients:
+                        clients_by_ip[ip].remove(client)
+                    
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid message format: {message}")
+                
+        except Exception as e:
+            logger.error(f"WebSocket error: {str(e)}")
+        finally:
+            if ip in clients_by_ip:
+                clients_by_ip[ip].discard(ws)
+                if not clients_by_ip[ip]:
+                    del clients_by_ip[ip]
+                    if ip in content_by_ip:
+                        del content_by_ip[ip]
+            try:
+                ws.close()
+            except:
+                pass
+    return ''
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    server = pywsgi.WSGIServer(('0.0.0.0', 5050), app, handler_class=WebSocketHandler)
+    print("Server starting on http://localhost:5050")
+    server.serve_forever()
