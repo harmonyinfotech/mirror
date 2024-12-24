@@ -1,54 +1,109 @@
-# Magic Mirror ✨
+# Magic Mirror
 
-> Share text magically between devices
+A simple, real-time text sharing application that works like magic! Share text instantly between devices on your network.
 
-Magic Mirror is a simple yet powerful tool that makes text sharing between devices feel magical. No complex setup, no accounts needed - just open the page and watch your text sync instantly across all your devices.
+## Features
 
-## Features ✨
+- Real-time text synchronization
+- IP-based content isolation
+- Automatic QR code generation
+- Analytics tracking
+- Debug information
+- No installation required for users
 
-- **Instant Sharing**: Text syncs automatically between devices
-- **No Installation**: Works in any modern browser
-- **No Sign-up**: Just open and start sharing
-- **Network Isolation**: Content only visible to devices on your network
-- **Clipboard Integration**: Quick copy/paste with keyboard shortcuts
-- **Privacy First**: No data stored in the cloud
-- **Real-time Stats**: Track usage and syncs
-- **Open Source**: Free and transparent
+## Development Setup
 
-## How It Works 🪄
-
-1. Open Magic Mirror on your devices
-2. Type or paste your content
-3. Watch it magically appear on all devices
-4. Content expires after 24 hours
-
-## Development 🛠️
-
+1. Clone the repository:
 ```bash
-# Clone the repository
 git clone https://github.com/harmonyinfotech/mirror.git
 cd mirror
+```
 
-# Install dependencies
+2. Create a virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
 pip install -r requirements.txt
+```
 
-# Run the development server
+4. Run the development server:
+```bash
 python app.py
 ```
 
-## Contributing 🤝
+## Production Deployment
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+The application is deployed at `/var/www/mirror` on the production server. Here's how to update it:
 
-## License 📄
+1. SSH into the server and navigate to the app directory:
+```bash
+cd /var/www/mirror
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+2. Activate the virtual environment:
+```bash
+source venv/bin/activate
+```
 
-## Acknowledgments 🙏
+3. Pull the latest changes:
+```bash
+git pull
+```
 
-- Built with Flask and modern web technologies
-- Made with 💜 for the magical web
+4. Install any new dependencies:
+```bash
+pip install -r requirements.txt
+```
 
----
+5. Restart the service:
+```bash
+sudo systemctl restart mirror
+```
 
-© 2024 Magic Mirror - Share text magically
+## File Structure
+
+- `app.py`: Main application file
+- `templates/`: HTML templates
+- `analytics.db`: SQLite database for analytics (auto-created)
+- `logs/`: Application logs
+- `requirements.txt`: Python dependencies
+
+## Analytics
+
+The application uses SQLite to store analytics data in `analytics.db`. This includes:
+- Total page views
+- Daily views
+- Online device count
+- Unique visitors
+
+The database is automatically created when the application starts.
+
+## Security
+
+- Content is isolated by IP address
+- No sensitive data is stored
+- All data is temporary and in-memory except for analytics
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Check the logs:
+```bash
+tail -f /var/www/mirror/logs/app.log
+```
+
+2. View debug information at `/debug` endpoint
+
+3. Verify service status:
+```bash
+sudo systemctl status mirror
+```
+
+## License
+
+MIT License - Feel free to use and modify!
