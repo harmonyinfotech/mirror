@@ -205,6 +205,28 @@
             border-top: 1px solid #E2E8F0;
         }
         
+        .connection-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+            background-color: #ccc;
+        }
+        
+        .connection-status.connected {
+            background-color: #48BB78;
+        }
+        
+        .connection-status.disconnected {
+            background-color: #F56565;
+        }
+        
+        .connection-text {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+        
         @media (max-width: 768px) {
             .main-container {
                 grid-template-columns: 1fr;
@@ -264,11 +286,27 @@
             <span>Online Devices: {{ analytics.online_devices }}</span>
             <span>Today's Views: {{ analytics.daily_views }}</span>
         </div>
+        <div class="connection-info">
+            <span class="connection-status" id="connection-status"></span>
+            <span class="connection-text" id="connection-text">Connecting...</span>
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <script>
+        let reconnectAttempts = 0;
+        let ws = null;
+        const MAX_RECONNECT_DELAY = 5000;
+        
+        function updateConnectionStatus(connected, message) {
+            const status = document.getElementById('connection-status');
+            const text = document.getElementById('connection-text');
+            
+            status.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
+            text.textContent = message;
+        }
+        
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
@@ -288,6 +326,11 @@
         function clearContent() {
             if (confirm('Are you sure you want to clear the content?')) {
                 document.getElementById('content').value = '';
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        content: ''
+                    }));
+                }
                 showToast('Content cleared! 🗑️');
             }
         }
@@ -297,24 +340,42 @@
             img.src = '/qr?' + new Date().getTime();
         }
         
-        // Initialize WebSocket connection
-        function initEditor() {
-            const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
-            const textarea = document.getElementById('content');
+        function initWebSocket() {
+            if (ws) {
+                ws.close();
+            }
+            
+            ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
             
             ws.onopen = () => {
                 console.log('Connected to server');
-                showToast('Connected to room ✓');
+                updateConnectionStatus(true, 'Connected');
+                reconnectAttempts = 0;
             };
             
             ws.onclose = () => {
                 console.log('Disconnected from server');
-                showToast('Disconnected from room ✗');
-                setTimeout(initEditor, 1000);  // Try to reconnect
+                updateConnectionStatus(false, 'Reconnecting...');
+                
+                // Exponential backoff for reconnection
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+                reconnectAttempts++;
+                
+                setTimeout(() => {
+                    if (document.visibilityState === 'visible') {
+                        initWebSocket();
+                    }
+                }, delay);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false, 'Connection error');
             };
             
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                const textarea = document.getElementById('content');
                 if (data.content !== textarea.value) {
                     const start = textarea.selectionStart;
                     const end = textarea.selectionEnd;
@@ -327,25 +388,35 @@
                     }
                 }
             };
-            
-            // Handle text changes
-            let typingTimer;
-            const TYPING_DELAY = 500;
-            
-            textarea.addEventListener('input', () => {
-                clearTimeout(typingTimer);
-                typingTimer = setTimeout(() => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            content: textarea.value
-                        }));
-                    }
-                }, TYPING_DELAY);
-            });
         }
         
-        // Start the editor
-        initEditor();
+        // Handle text changes
+        let typingTimer;
+        const TYPING_DELAY = 500;
+        
+        document.getElementById('content').addEventListener('input', () => {
+            const textarea = document.getElementById('content');
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        content: textarea.value
+                    }));
+                }
+            }, TYPING_DELAY);
+        });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    initWebSocket();
+                }
+            }
+        });
+        
+        // Start the WebSocket connection
+        initWebSocket();
     </script>
 </body>
 </html>
