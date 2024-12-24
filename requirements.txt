@@ -1,5 +1,5 @@
 Flask==2.0.1
-gevent==21.8.0
+Werkzeug==2.0.3
 gevent-websocket==0.10.1
 qrcode[pil]==7.3
 python-dotenv==1.0.0
