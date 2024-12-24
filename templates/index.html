@@ -330,26 +330,73 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        let reconnectAttempts = 0;
-        let ws = null;
-        const MAX_RECONNECT_DELAY = 5000;
+        let pollInterval;
+        const POLL_INTERVAL = 1000; // Poll every second
         
-        function updateConnectionStatus(connected, message) {
-            const status = document.getElementById('connection-status');
-            const text = document.getElementById('connection-text');
+        function startPolling() {
+            // Initial poll
+            pollContent();
             
-            status.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
-            text.textContent = message;
+            // Set up regular polling
+            pollInterval = setInterval(pollContent, POLL_INTERVAL);
         }
         
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+        function pollContent() {
+            fetch('/content')
+                .then(response => response.json())
+                .then(data => {
+                    const textarea = document.getElementById('content');
+                    if (data.content !== textarea.value) {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        textarea.value = data.content;
+                        textarea.selectionStart = start;
+                        textarea.selectionEnd = end;
+                        
+                        if (data.content && data.content.length > 0) {
+                            generateQR();
+                        }
+                    }
+                    
+                    // Update analytics
+                    document.querySelector('.stats span:nth-child(1)').textContent = `Total Views: ${data.analytics.views}`;
+                    document.querySelector('.stats span:nth-child(2)').textContent = `Online Devices: ${data.analytics.online_devices}`;
+                    document.querySelector('.stats span:nth-child(3)').textContent = `Today's Views: ${data.analytics.daily_views}`;
+                })
+                .catch(error => console.error('Error polling content:', error));
         }
+        
+        // Handle text changes
+        let typingTimer;
+        const TYPING_DELAY = 500;
+        
+        document.getElementById('content').addEventListener('input', () => {
+            const textarea = document.getElementById('content');
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                fetch('/content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: textarea.value
+                    })
+                });
+            }, TYPING_DELAY);
+        });
+        
+        // Start polling when page loads
+        startPolling();
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                startPolling();
+            } else {
+                clearInterval(pollInterval);
+            }
+        });
         
         function copyToClipboard() {
             const textarea = document.getElementById('content');
@@ -361,11 +408,15 @@
         function clearContent() {
             if (confirm('Are you sure you want to clear the content?')) {
                 document.getElementById('content').value = '';
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
+                fetch('/content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         content: ''
-                    }));
-                }
+                    })
+                });
                 showToast('Content cleared! 🗑️');
             }
         }
@@ -375,92 +426,14 @@
             img.src = '/qr?' + new Date().getTime();
         }
         
-        function initWebSocket() {
-            if (ws) {
-                ws.close();
-            }
-            
-            // Get the current hostname
-            const hostname = window.location.hostname;
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const port = window.location.port ? `:${window.location.port}` : '';
-            
-            // Construct WebSocket URL
-            const wsUrl = `${protocol}//${hostname}${port}/ws`;
-            console.log('Connecting to WebSocket:', wsUrl);
-            
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = () => {
-                console.log('Connected to server');
-                updateConnectionStatus(true, 'Connected');
-                reconnectAttempts = 0;
-            };
-            
-            ws.onclose = (event) => {
-                console.log('Disconnected from server:', event.code, event.reason);
-                updateConnectionStatus(false, 'Reconnecting...');
-                
-                // Exponential backoff for reconnection
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
-                reconnectAttempts++;
-                
-                setTimeout(() => {
-                    if (document.visibilityState === 'visible') {
-                        initWebSocket();
-                    }
-                }, delay);
-            };
-            
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                updateConnectionStatus(false, 'Connection error');
-            };
-            
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const textarea = document.getElementById('content');
-                if (data.content !== textarea.value) {
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    textarea.value = data.content;
-                    textarea.selectionStart = start;
-                    textarea.selectionEnd = end;
-                    
-                    if (data.content && data.content.length > 0) {
-                        generateQR();
-                    }
-                }
-            };
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
         }
-        
-        // Handle text changes
-        let typingTimer;
-        const TYPING_DELAY = 500;
-        
-        document.getElementById('content').addEventListener('input', () => {
-            const textarea = document.getElementById('content');
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        content: textarea.value
-                    }));
-                }
-            }, TYPING_DELAY);
-        });
-        
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                if (!ws || ws.readyState !== WebSocket.OPEN) {
-                    initWebSocket();
-                }
-            }
-        });
-        
-        // Start the WebSocket connection
-        initWebSocket();
     </script>
 </body>
 </html>

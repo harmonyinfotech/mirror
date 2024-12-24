@@ -7,7 +7,6 @@ import logging
 import threading
 from logging.handlers import RotatingFileHandler
 from gevent import pywsgi
-from geventwebsocket.handler import WebSocketHandler
 import io
 import qrcode
 from PIL import Image
@@ -112,6 +111,21 @@ def index():
                          analytics=get_analytics(),
                          version=VERSION)
 
+@app.route('/content', methods=['GET', 'POST'])
+def handle_content():
+    """Handle content updates"""
+    ip = get_client_ip()
+    
+    if request.method == 'POST':
+        content = request.json.get('content', '')
+        content_by_ip[ip] = content
+        return jsonify({'status': 'ok'})
+    else:
+        return jsonify({
+            'content': content_by_ip.get(ip, ''),
+            'analytics': get_analytics()
+        })
+
 @app.route('/qr')
 def generate_qr():
     """Generate QR code for current URL"""
@@ -171,69 +185,7 @@ def debug():
         logger.error(f"Debug page error: {str(e)}")
         return str(e), 500
 
-@app.route('/ws')
-def handle_websocket():
-    """Handle WebSocket connections"""
-    try:
-        if request.environ.get('wsgi.websocket'):
-            ws = request.environ['wsgi.websocket']
-            ip = request.remote_addr
-            
-            # Initialize client list for this IP if it doesn't exist
-            if ip not in clients_by_ip:
-                clients_by_ip[ip] = []
-            
-            # Add this client to the list
-            clients_by_ip[ip].append(ws)
-            logger.info(f"New WebSocket connection from {ip}")
-            
-            try:
-                while True:
-                    message = ws.receive()
-                    if message is None:
-                        break
-                    
-                    try:
-                        data = json.loads(message)
-                        content = data.get('content', '')
-                        
-                        # Store the content
-                        content_by_ip[ip] = content
-                        
-                        # Broadcast to all clients with same IP
-                        dead_clients = []
-                        for client in clients_by_ip[ip]:
-                            try:
-                                if client != ws:  # Don't send back to sender
-                                    client.send(json.dumps({'content': content}))
-                            except WebSocketError:
-                                dead_clients.append(client)
-                        
-                        # Clean up dead connections
-                        for dead_client in dead_clients:
-                            clients_by_ip[ip].remove(dead_client)
-                            
-                    except json.JSONDecodeError:
-                        logger.error(f"Invalid JSON received: {message}")
-                        continue
-                    
-            except WebSocketError as e:
-                logger.error(f"WebSocket error for {ip}: {str(e)}")
-            finally:
-                # Clean up when the connection closes
-                if ws in clients_by_ip[ip]:
-                    clients_by_ip[ip].remove(ws)
-                if not clients_by_ip[ip]:  # If no more clients for this IP
-                    del clients_by_ip[ip]
-                logger.info(f"WebSocket connection closed for {ip}")
-                
-        return '', 400  # Bad request if not a WebSocket connection
-        
-    except Exception as e:
-        logger.error(f"Error in handle_websocket: {str(e)}")
-        return str(e), 500
-
 if __name__ == '__main__':
-    server = pywsgi.WSGIServer(('0.0.0.0', 5050), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('0.0.0.0', 5050), app)
     print("Server starting on http://localhost:5050")
     server.serve_forever()
