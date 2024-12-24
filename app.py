@@ -30,6 +30,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 logger = app.logger
 
+# Version number
+VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
+
 # Initialize SQLite database
 def init_db():
     db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
@@ -106,7 +109,8 @@ def index():
     update_analytics(ip)
     return render_template('index.html', 
                          content=content_by_ip.get(ip, ''),
-                         analytics=get_analytics())
+                         analytics=get_analytics(),
+                         version=VERSION)
 
 @app.route('/qr')
 def generate_qr():
@@ -170,60 +174,64 @@ def debug():
 @app.route('/ws')
 def handle_websocket():
     """Handle WebSocket connections"""
-    if request.environ.get('wsgi.websocket'):
-        ws = request.environ['wsgi.websocket']
-        ip = get_client_ip()
-        
-        try:
-            # Initialize client list for this IP if needed
+    try:
+        if request.environ.get('wsgi.websocket'):
+            ws = request.environ['wsgi.websocket']
+            ip = request.remote_addr
+            
+            # Initialize client list for this IP if it doesn't exist
             if ip not in clients_by_ip:
-                clients_by_ip[ip] = set()
-            clients_by_ip[ip].add(ws)
+                clients_by_ip[ip] = []
             
-            logger.info(f"Client connected from IP: {ip}")
+            # Add this client to the list
+            clients_by_ip[ip].append(ws)
+            logger.info(f"New WebSocket connection from {ip}")
             
-            while True:
-                message = ws.receive()
-                if message is None:
-                    break
-                
-                try:
-                    data = json.loads(message)
-                    content = data.get('content', '')
-                    
-                    # Update content for this IP
-                    content_by_ip[ip] = content
-                    
-                    # Broadcast to all clients with same IP
-                    dead_clients = set()
-                    for client in clients_by_ip[ip]:
-                        try:
-                            if client != ws:  # Don't send back to sender
-                                client.send(json.dumps({'content': content}))
-                        except Exception:
-                            dead_clients.add(client)
-                    
-                    # Clean up dead clients
-                    for client in dead_clients:
-                        clients_by_ip[ip].remove(client)
-                    
-                except json.JSONDecodeError:
-                    logger.error(f"Invalid message format: {message}")
-                
-        except Exception as e:
-            logger.error(f"WebSocket error: {str(e)}")
-        finally:
-            if ip in clients_by_ip:
-                clients_by_ip[ip].discard(ws)
-                if not clients_by_ip[ip]:
-                    del clients_by_ip[ip]
-                    if ip in content_by_ip:
-                        del content_by_ip[ip]
             try:
-                ws.close()
-            except:
-                pass
-    return ''
+                while True:
+                    message = ws.receive()
+                    if message is None:
+                        break
+                    
+                    try:
+                        data = json.loads(message)
+                        content = data.get('content', '')
+                        
+                        # Store the content
+                        content_by_ip[ip] = content
+                        
+                        # Broadcast to all clients with same IP
+                        dead_clients = []
+                        for client in clients_by_ip[ip]:
+                            try:
+                                if client != ws:  # Don't send back to sender
+                                    client.send(json.dumps({'content': content}))
+                            except WebSocketError:
+                                dead_clients.append(client)
+                        
+                        # Clean up dead connections
+                        for dead_client in dead_clients:
+                            clients_by_ip[ip].remove(dead_client)
+                            
+                    except json.JSONDecodeError:
+                        logger.error(f"Invalid JSON received: {message}")
+                        continue
+                    
+            except WebSocketError as e:
+                logger.error(f"WebSocket error for {ip}: {str(e)}")
+            finally:
+                # Clean up when the connection closes
+                if ws in clients_by_ip[ip]:
+                    clients_by_ip[ip].remove(ws)
+                if not clients_by_ip[ip]:  # If no more clients for this IP
+                    del clients_by_ip[ip]
+                logger.info(f"WebSocket connection closed for {ip}")
+                
+        return '', 400  # Bad request if not a WebSocket connection
+        
+    except Exception as e:
+        logger.error(f"Error in handle_websocket: {str(e)}")
+        return str(e), 500
 
 if __name__ == '__main__':
     server = pywsgi.WSGIServer(('0.0.0.0', 5050), app, handler_class=WebSocketHandler)

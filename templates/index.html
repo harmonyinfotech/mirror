@@ -205,6 +205,32 @@
             border-top: 1px solid #E2E8F0;
         }
         
+        .footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .footer-links {
+            margin-top: 0.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .footer-links span {
+            color: #CBD5E0;
+        }
+        
+        .version {
+            color: #A0AEC0;
+            font-size: 0.8rem;
+        }
+        
         .connection-status {
             display: inline-block;
             width: 8px;
@@ -290,6 +316,11 @@
             <span class="connection-status" id="connection-status"></span>
             <span class="connection-text" id="connection-text">Connecting...</span>
         </div>
+        <div class="footer-links">
+            <a href="/debug">Debug Info</a>
+            <span>•</span>
+            <span class="version">v{{ version }}</span>
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -345,7 +376,16 @@
                 ws.close();
             }
             
-            ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
+            // Get the current hostname
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const port = window.location.port ? `:${window.location.port}` : '';
+            
+            // Construct WebSocket URL
+            const wsUrl = `${protocol}//${hostname}${port}/ws`;
+            console.log('Connecting to WebSocket:', wsUrl);
+            
+            ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
                 console.log('Connected to server');
@@ -353,8 +393,8 @@
                 reconnectAttempts = 0;
             };
             
-            ws.onclose = () => {
-                console.log('Disconnected from server');
+            ws.onclose = (event) => {
+                console.log('Disconnected from server:', event.code, event.reason);
                 updateConnectionStatus(false, 'Reconnecting...');
                 
                 // Exponential backoff for reconnection
