@@ -35,128 +35,132 @@ VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
 # Initialize SQLite database
 def init_db():
     """Initialize database"""
-    conn = sqlite3.connect('analytics.db')
-    c = conn.cursor()
-    
-    # Create tables if not exist
-    c.execute('''CREATE TABLE IF NOT EXISTS analytics
-                 (key TEXT PRIMARY KEY, value INTEGER)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS visits
-                 (ip TEXT, timestamp TEXT)''')
-    
-    # Initialize total_views if not exists
-    c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_views", 0)')
-    c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_syncs", 0)')
-    
-    conn.commit()
-    conn.close()
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        
+        # Create tables if not exist
+        c.execute('''CREATE TABLE IF NOT EXISTS analytics
+                     (key TEXT PRIMARY KEY, value INTEGER)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS visits
+                     (ip TEXT, timestamp TEXT)''')
+        
+        # Initialize total_views if not exists
+        c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_views", 0)')
+        c.execute('INSERT OR IGNORE INTO analytics (key, value) VALUES ("total_syncs", 0)')
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Database initialization error: {str(e)}")
 
 # Update analytics
 def update_analytics(ip):
     """Update analytics data"""
-    with analytics_lock:
-        try:
-            conn = sqlite3.connect('analytics.db')
-            c = conn.cursor()
-            
-            # Update total views - using INSERT OR REPLACE with COALESCE
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        
+        # Update total views - using INSERT OR REPLACE with COALESCE
+        c.execute('''
+            INSERT OR REPLACE INTO analytics (key, value)
+            VALUES ("total_views", 
+                COALESCE(
+                    (SELECT value + 1 FROM analytics WHERE key = "total_views"),
+                    1
+                )
+            )
+        ''')
+        
+        # Update daily views
+        today = datetime.now().strftime('%Y-%m-%d')
+        daily_key = f"daily_views_{today}"
+        c.execute('''
+            INSERT OR REPLACE INTO analytics (key, value)
+            VALUES (?, 
+                COALESCE(
+                    (SELECT value + 1 FROM analytics WHERE key = ?),
+                    1
+                )
+            )
+        ''', (daily_key, daily_key))
+        
+        # Record visit with timestamp
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('INSERT INTO visits (ip, timestamp) VALUES (?, ?)', (ip, now))
+        
+        # Update total syncs when content is updated
+        if request and request.endpoint == 'handle_content' and request.method == 'POST':
             c.execute('''
                 INSERT OR REPLACE INTO analytics (key, value)
-                VALUES ("total_views", 
+                VALUES ("total_syncs", 
                     COALESCE(
-                        (SELECT value + 1 FROM analytics WHERE key = "total_views"),
+                        (SELECT value + 1 FROM analytics WHERE key = "total_syncs"),
                         1
                     )
                 )
             ''')
-            
-            # Update daily views
-            today = datetime.now().strftime('%Y-%m-%d')
-            daily_key = f"daily_views_{today}"
-            c.execute('''
-                INSERT OR REPLACE INTO analytics (key, value)
-                VALUES (?, 
-                    COALESCE(
-                        (SELECT value + 1 FROM analytics WHERE key = ?),
-                        1
-                    )
-                )
-            ''', (daily_key, daily_key))
-            
-            # Record visit with timestamp
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            c.execute('INSERT INTO visits (ip, timestamp) VALUES (?, ?)', (ip, now))
-            
-            # Update total syncs when content is updated
-            if request.endpoint == 'handle_content' and request.method == 'POST':
-                c.execute('''
-                    INSERT OR REPLACE INTO analytics (key, value)
-                    VALUES ("total_syncs", 
-                        COALESCE(
-                            (SELECT value + 1 FROM analytics WHERE key = "total_syncs"),
-                            1
-                        )
-                    )
-                ''')
-            
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            logger.error(f"Error updating analytics: {str(e)}")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error updating analytics: {str(e)}")
 
 # Get analytics data
 def get_analytics():
     """Get analytics data"""
-    with analytics_lock:
-        try:
-            conn = sqlite3.connect('analytics.db')
-            c = conn.cursor()
-            
-            # Get total views
-            c.execute('SELECT value FROM analytics WHERE key = "total_views"')
-            result = c.fetchone()
-            total_views = result[0] if result else 0
-            
-            # Get today's views
-            today = datetime.now().strftime('%Y-%m-%d')
-            c.execute('SELECT value FROM analytics WHERE key = ?', (f"daily_views_{today}",))
-            result = c.fetchone()
-            daily_views = result[0] if result else 0
-            
-            # Get unique devices in last hour
-            hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-            c.execute('SELECT COUNT(DISTINCT ip) FROM visits WHERE timestamp > ?', (hour_ago,))
-            result = c.fetchone()
-            online_devices = result[0] if result else 0
-            
-            # Get total unique visitors
-            c.execute('SELECT COUNT(DISTINCT ip) FROM visits')
-            result = c.fetchone()
-            total_unique_visitors = result[0] if result else 0
-            
-            # Get total content syncs (number of content updates)
-            c.execute('SELECT value FROM analytics WHERE key = "total_syncs"')
-            result = c.fetchone()
-            total_syncs = result[0] if result else 0
-            
-            conn.close()
-            
-            return {
-                'views': total_views,
-                'daily_views': daily_views,
-                'online_devices': online_devices,
-                'total_unique_visitors': total_unique_visitors,
-                'total_syncs': total_syncs
-            }
-        except Exception as e:
-            logger.error(f"Error getting analytics: {str(e)}")
-            return {
-                'views': 0,
-                'daily_views': 0,
-                'online_devices': 0,
-                'total_unique_visitors': 0,
-                'total_syncs': 0
-            }
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        
+        # Get total views
+        c.execute('SELECT value FROM analytics WHERE key = "total_views"')
+        result = c.fetchone()
+        total_views = result[0] if result else 0
+        
+        # Get today's views
+        today = datetime.now().strftime('%Y-%m-%d')
+        c.execute('SELECT value FROM analytics WHERE key = ?', (f"daily_views_{today}",))
+        result = c.fetchone()
+        daily_views = result[0] if result else 0
+        
+        # Get unique devices in last hour
+        hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('SELECT COUNT(DISTINCT ip) FROM visits WHERE timestamp > ?', (hour_ago,))
+        result = c.fetchone()
+        online_devices = result[0] if result else 0
+        
+        # Get total unique visitors
+        c.execute('SELECT COUNT(DISTINCT ip) FROM visits')
+        result = c.fetchone()
+        total_unique_visitors = result[0] if result else 0
+        
+        # Get total content syncs (number of content updates)
+        c.execute('SELECT value FROM analytics WHERE key = "total_syncs"')
+        result = c.fetchone()
+        total_syncs = result[0] if result else 0
+        
+        conn.close()
+        
+        return {
+            'views': total_views,
+            'daily_views': daily_views,
+            'online_devices': online_devices,
+            'total_unique_visitors': total_unique_visitors,
+            'total_syncs': total_syncs
+        }
+    except Exception as e:
+        logger.error(f"Error getting analytics: {str(e)}")
+        return {
+            'views': 0,
+            'daily_views': 0,
+            'online_devices': 0,
+            'total_unique_visitors': 0,
+            'total_syncs': 0
+        }
 
 # Initialize database on startup
 init_db()
@@ -174,8 +178,11 @@ def get_client_ip():
 @app.before_request
 def before_request():
     """Update analytics before each request"""
-    if not request.path.startswith(('/static/', '/favicon.ico')):
-        update_analytics(get_client_ip())
+    try:
+        if not request.path.startswith(('/static/', '/favicon.ico')):
+            update_analytics(get_client_ip())
+    except Exception as e:
+        logger.error(f"Error in before_request: {str(e)}")
 
 @app.route('/')
 def index():
