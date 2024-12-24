@@ -281,11 +281,11 @@
                 <button class="action-button" onclick="copyToClipboard()" title="Copy to clipboard">
                     📋 Copy
                 </button>
+                <button class="action-button" onclick="pasteFromClipboard()" title="Paste from clipboard">
+                    📝 Paste
+                </button>
                 <button class="action-button secondary" onclick="clearContent()" title="Clear content">
                     🗑️ Clear
-                </button>
-                <button class="action-button" onclick="window.location.href='/debug'" title="View debug info">
-                    🔧 Debug
                 </button>
             </div>
         </div>
@@ -458,6 +458,18 @@
                     })
                 });
                 showToast('Content cleared! 🗑️');
+            }
+        }
+        
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('content').value = text;
+                document.getElementById('content').dispatchEvent(new Event('input'));
+                showToast('Content pasted from clipboard');
+            } catch (err) {
+                showToast('Failed to paste from clipboard');
+                console.error('Failed to paste:', err);
             }
         }
         
