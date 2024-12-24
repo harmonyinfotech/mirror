@@ -33,24 +33,19 @@ logger = app.logger
 VERSION = "1.2.0"  # IP-based isolation with QR codes and analytics
 
 # Initialize SQLite database
-def migrate_db():
-    """Migrate database schema"""
+def init_db():
+    """Initialize database with fresh tables"""
     try:
         db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
         
-        # Backup old database if exists
+        # Delete existing database if any
         if os.path.exists(db_path):
-            backup_path = db_path + '.backup'
-            os.rename(db_path, backup_path)
-            logger.info(f"Backed up database to {backup_path}")
+            os.remove(db_path)
+            logger.info("Removed old database")
         
-        # Create new database with correct schema
+        # Create fresh database
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        
-        # Drop existing tables if any
-        c.execute('DROP TABLE IF EXISTS analytics')
-        c.execute('DROP TABLE IF EXISTS visits')
         
         # Create tables with correct schema
         c.execute('''CREATE TABLE analytics
@@ -68,55 +63,10 @@ def migrate_db():
         
         conn.commit()
         conn.close()
-        
-        logger.info("Database migration completed successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Database migration error: {str(e)}")
-        return False
-
-def init_db():
-    """Initialize database"""
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), 'analytics.db')
-        
-        # Check if database exists
-        if not os.path.exists(db_path):
-            conn = sqlite3.connect(db_path)
-            c = conn.cursor()
-            
-            # Create tables with correct schema
-            c.execute('''CREATE TABLE analytics
-                         (key TEXT PRIMARY KEY,
-                          value INTEGER DEFAULT 0)''')
-            
-            c.execute('''CREATE TABLE visits
-                         (ip TEXT,
-                          timestamp TEXT,
-                          UNIQUE(ip, timestamp))''')
-            
-            # Initialize default values
-            c.execute('INSERT INTO analytics (key, value) VALUES ("total_views", 0)')
-            c.execute('INSERT INTO analytics (key, value) VALUES ("total_syncs", 0)')
-            
-            conn.commit()
-            conn.close()
-            logger.info("Database initialized successfully")
-        else:
-            # Verify schema and migrate if needed
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute('SELECT key, value FROM analytics LIMIT 1')
-                c.execute('SELECT ip, timestamp FROM visits LIMIT 1')
-                conn.close()
-            except sqlite3.OperationalError:
-                logger.warning("Database schema needs migration")
-                migrate_db()
+        logger.info("Created fresh database with new schema")
     except Exception as e:
         logger.error(f"Database initialization error: {str(e)}")
 
-# Update analytics
 def update_analytics(ip):
     """Update analytics data"""
     try:
@@ -124,44 +74,34 @@ def update_analytics(ip):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         
-        # Update total views - using INSERT OR REPLACE with COALESCE
+        # Update total views
         c.execute('''
-            INSERT OR REPLACE INTO analytics (key, value)
-            VALUES ("total_views", 
-                COALESCE(
-                    (SELECT value + 1 FROM analytics WHERE key = "total_views"),
-                    1
-                )
-            )
+            UPDATE analytics 
+            SET value = value + 1 
+            WHERE key = "total_views"
         ''')
         
         # Update daily views
         today = datetime.now().strftime('%Y-%m-%d')
         daily_key = f"daily_views_{today}"
         c.execute('''
-            INSERT OR REPLACE INTO analytics (key, value)
-            VALUES (?, 
-                COALESCE(
-                    (SELECT value + 1 FROM analytics WHERE key = ?),
-                    1
-                )
-            )
-        ''', (daily_key, daily_key))
+            UPDATE analytics 
+            SET value = value + 1 
+            WHERE key = ?
+        ''', (daily_key,))
+        if c.rowcount == 0:
+            c.execute('INSERT INTO analytics (key, value) VALUES (?, 1)', (daily_key,))
         
-        # Record visit with timestamp
+        # Record visit
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         c.execute('INSERT OR IGNORE INTO visits (ip, timestamp) VALUES (?, ?)', (ip, now))
         
         # Update total syncs when content is updated
         if request and request.endpoint == 'handle_content' and request.method == 'POST':
             c.execute('''
-                INSERT OR REPLACE INTO analytics (key, value)
-                VALUES ("total_syncs", 
-                    COALESCE(
-                        (SELECT value + 1 FROM analytics WHERE key = "total_syncs"),
-                        1
-                    )
-                )
+                UPDATE analytics 
+                SET value = value + 1 
+                WHERE key = "total_syncs"
             ''')
         
         conn.commit()
@@ -169,7 +109,6 @@ def update_analytics(ip):
     except Exception as e:
         logger.error(f"Error updating analytics: {str(e)}")
 
-# Get analytics data
 def get_analytics():
     """Get analytics data"""
     try:
@@ -199,7 +138,7 @@ def get_analytics():
         result = c.fetchone()
         total_unique_visitors = result[0] if result else 0
         
-        # Get total content syncs (number of content updates)
+        # Get total content syncs
         c.execute('SELECT value FROM analytics WHERE key = "total_syncs"')
         result = c.fetchone()
         total_syncs = result[0] if result else 0
