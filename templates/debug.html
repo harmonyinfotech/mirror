@@ -159,6 +159,7 @@
                 <pre>{% for ip, info in debug_info.active_ips.items() %}{{ ip }} {% if info.is_current_ip %}(You){% endif %}:
   Content Length: {{ info.content_length }} chars
   Last Activity: {{ info.last_activity }}
+  Content Preview: {{ info.content_preview }}
 {% endfor %}</pre>
             </div>
         </div>

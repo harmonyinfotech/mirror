@@ -334,6 +334,7 @@
         const POLL_INTERVAL = 1000; // Poll every second
         let lastContent = '{{ content }}'; // Initialize with server content
         let isTyping = false;
+        let lastTypingTime = Date.now();
         
         function startPolling() {
             // Initial poll
@@ -344,24 +345,42 @@
         }
         
         function pollContent() {
-            if (isTyping) return; // Don't poll while user is typing
+            // Don't poll if user is actively typing or it's been less than 2 seconds since last type
+            if (isTyping || (Date.now() - lastTypingTime) < 2000) return;
             
             fetch('/content')
                 .then(response => response.json())
                 .then(data => {
                     const textarea = document.getElementById('content');
-                    // Only update if content has changed and user isn't typing
-                    if (data.content !== lastContent && !isTyping) {
+                    const currentLength = textarea.value.length;
+                    const newContent = data.content;
+                    
+                    // Only update if:
+                    // 1. Content has changed
+                    // 2. User isn't typing
+                    // 3. Either:
+                    //    a. Current content is empty, or
+                    //    b. New content is longer than current content
+                    if (newContent !== lastContent && 
+                        !isTyping && 
+                        (currentLength === 0 || newContent.length > currentLength)) {
+                        
                         const start = textarea.selectionStart;
                         const end = textarea.selectionEnd;
-                        textarea.value = data.content;
+                        textarea.value = newContent;
                         textarea.selectionStart = start;
                         textarea.selectionEnd = end;
-                        lastContent = data.content;
+                        lastContent = newContent;
                         
-                        if (data.content && data.content.length > 0) {
+                        if (newContent && newContent.length > 0) {
                             generateQR();
                         }
+                        
+                        // Show network status
+                        const networkContent = data.network_content;
+                        const activeUsers = Object.keys(networkContent).length;
+                        document.querySelector('.connection-text').textContent = 
+                            `Connected (${activeUsers} active user${activeUsers !== 1 ? 's' : ''})`;
                     }
                     
                     // Update analytics
@@ -383,6 +402,7 @@
         document.getElementById('content').addEventListener('input', () => {
             const textarea = document.getElementById('content');
             isTyping = true;
+            lastTypingTime = Date.now();
             clearTimeout(typingTimer);
             
             typingTimer = setTimeout(() => {

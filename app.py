@@ -94,6 +94,7 @@ init_db()
 
 # In-memory storage
 content_by_ip = {}
+last_update_by_ip = {}  # Track last update time for each IP
 clients_by_ip = {}
 analytics_lock = threading.Lock()
 
@@ -119,10 +120,41 @@ def handle_content():
     if request.method == 'POST':
         content = request.json.get('content', '')
         content_by_ip[ip] = content
+        last_update_by_ip[ip] = datetime.now()
         return jsonify({'status': 'ok'})
     else:
+        # Get all content for this IP's network
+        network_content = {}
+        current_time = datetime.now()
+        
+        for other_ip, content in content_by_ip.items():
+            # Only include content from last 5 minutes
+            if other_ip in last_update_by_ip:
+                time_diff = (current_time - last_update_by_ip[other_ip]).total_seconds()
+                if time_diff <= 300:  # 5 minutes
+                    network_content[other_ip] = {
+                        'content': content,
+                        'length': len(content),
+                        'last_update': last_update_by_ip[other_ip].isoformat()
+                    }
+        
+        # Determine which content to return based on length and recency
+        current_content = content_by_ip.get(ip, '')
+        if network_content:
+            # Sort by content length and recency
+            sorted_content = sorted(
+                network_content.items(),
+                key=lambda x: (x[1]['length'], x[1]['last_update']),
+                reverse=True
+            )
+            
+            # If current content is shorter, use the longest content from network
+            if len(current_content) < sorted_content[0][1]['length']:
+                current_content = sorted_content[0][1]['content']
+        
         return jsonify({
-            'content': content_by_ip.get(ip, ''),
+            'content': current_content,
+            'network_content': network_content,
             'analytics': get_analytics()
         })
 
@@ -176,7 +208,17 @@ def debug():
             active_ips[ip_addr] = {
                 'content_length': len(content),
                 'last_activity': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'is_current_ip': ip_addr == ip
+                'is_current_ip': ip_addr == ip,
+                'content_preview': content[:100] + '...' if len(content) > 100 else content
+            }
+        
+        # Add the current IP if not in content_by_ip
+        if ip not in active_ips:
+            active_ips[ip] = {
+                'content_length': 0,
+                'last_activity': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'is_current_ip': True,
+                'content_preview': ''
             }
         
         system_info = {
