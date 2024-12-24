@@ -332,6 +332,7 @@
     <script>
         let pollInterval;
         const POLL_INTERVAL = 1000; // Poll every second
+        let lastContent = ''; // Track last known content
         
         function startPolling() {
             // Initial poll
@@ -346,12 +347,14 @@
                 .then(response => response.json())
                 .then(data => {
                     const textarea = document.getElementById('content');
-                    if (data.content !== textarea.value) {
+                    // Only update if content has changed and is different from what user typed
+                    if (data.content !== lastContent && data.content !== textarea.value) {
                         const start = textarea.selectionStart;
                         const end = textarea.selectionEnd;
                         textarea.value = data.content;
                         textarea.selectionStart = start;
                         textarea.selectionEnd = end;
+                        lastContent = data.content;
                         
                         if (data.content && data.content.length > 0) {
                             generateQR();
@@ -374,6 +377,7 @@
             const textarea = document.getElementById('content');
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
+                lastContent = textarea.value; // Update last known content
                 fetch('/content', {
                     method: 'POST',
                     headers: {

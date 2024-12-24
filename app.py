@@ -153,8 +153,9 @@ def debug():
     try:
         analytics = get_analytics()
         system_info = {
-            'python_version': sys.version,
+            'python_version': sys.version.split()[0],
             'platform': sys.platform,
+            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'active_connections': sum(len(clients) for clients in clients_by_ip.values())
         }
         
@@ -170,17 +171,14 @@ def debug():
                 'total': sum(len(clients) for clients in clients_by_ip.values()),
                 'by_ip': {ip: len(clients_list) for ip, clients_list in clients_by_ip.items()}
             },
-            'system_info': {
-                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'content_store_size': len(content_by_ip)
-            }
+            'system_info': system_info
         }
         
-        return render_template('debug.html',
-                            system_info=system_info,
+        return render_template('debug.html', 
+                            debug_info=debug_info,
                             analytics=analytics,
                             recent_logs=recent_logs,
-                            debug_info=debug_info)
+                            version=VERSION)
     except Exception as e:
         logger.error(f"Debug page error: {str(e)}")
         return str(e), 500
