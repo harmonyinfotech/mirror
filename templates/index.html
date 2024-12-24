@@ -366,16 +366,8 @@
                     const currentLength = textarea.value.length;
                     const newContent = data.content;
                     
-                    // Only update if:
-                    // 1. Content has changed
-                    // 2. User isn't typing
-                    // 3. Either:
-                    //    a. Current content is empty, or
-                    //    b. New content is longer than current content
-                    if (newContent !== lastContent && 
-                        !isTyping && 
-                        (currentLength === 0 || newContent.length > currentLength)) {
-                        
+                    // Only update if content has changed
+                    if (newContent !== lastContent && !isTyping) {
                         const start = textarea.selectionStart;
                         const end = textarea.selectionEnd;
                         textarea.value = newContent;
@@ -383,21 +375,14 @@
                         textarea.selectionEnd = end;
                         lastContent = newContent;
                         
-                        if (newContent && newContent.length > 0) {
-                            generateQR();
-                        }
+                        // Update QR code when content changes
+                        generateQR();
                         
                         // Show network status
-                        const networkContent = data.network_content;
-                        const activeUsers = Object.keys(networkContent).length;
+                        const activeUsers = Object.keys(data.network || {}).length;
                         document.querySelector('.connection-text').textContent = 
                             `Connected (${activeUsers} active user${activeUsers !== 1 ? 's' : ''})`;
                     }
-                    
-                    // Update analytics
-                    document.querySelector('.stats span:nth-child(1)').textContent = `Total Views: ${data.analytics.views}`;
-                    document.querySelector('.stats span:nth-child(2)').textContent = `Online Devices: ${data.analytics.online_devices}`;
-                    document.querySelector('.stats span:nth-child(3)').textContent = `Today's Views: ${data.analytics.daily_views}`;
                 })
                 .catch(error => {
                     console.error('Error polling content:', error);
