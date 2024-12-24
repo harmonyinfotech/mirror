@@ -1,114 +1,281 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Magic Mirror - Share Text Magically</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Mirror - Instant Text Sharing</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
+    <meta name="keywords" content="magic mirror, text sharing, file sharing, local network, instant sync, clipboard sharing">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mirror.is/">
+    <meta property="og:title" content="Magic Mirror - Instant Text Sharing">
+    <meta property="og:description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
+    <meta property="og:image" content="https://mirror.is/static/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://mirror.is/">
+    <meta property="twitter:title" content="Magic Mirror - Instant Text Sharing">
+    <meta property="twitter:description" content="Share text magically between devices on your network. No signup, no installation - just open and share.">
+    <meta property="twitter:image" content="https://mirror.is/static/og-image.png">
+    
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background: #f5f5f5;
+        :root {
+            --primary-color: #2D3748;
+            --secondary-color: #4A5568;
+            --accent-color: #4299E1;
+            --background-color: #F7FAFC;
+            --text-color: #1A202C;
         }
-        .container {
-            max-width: 800px;
+        
+        body {
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1000px;
             margin: 0 auto;
-            background: white;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+            letter-spacing: -1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-icon {
+            font-size: 2rem;
+        }
+        
+        .tagline {
+            font-size: 1.1rem;
+            color: var(--secondary-color);
+            margin: 0.5rem 0;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        .stats {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .stats span {
+            margin-right: 1rem;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+        
+        .editor-container {
+            background-color: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
+        .ad-sidebar {
+            align-self: start;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .ad-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
         textarea {
             width: 100%;
             height: 300px;
             margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 15px;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
             resize: vertical;
+            font-size: 16px;
+            line-height: 1.5;
             font-family: monospace;
         }
-        .buttons {
-            margin: 10px 0;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
         }
-        button {
-            padding: 8px 16px;
+        
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        
+        .action-button {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.5rem 1rem;
             border: none;
             border-radius: 4px;
-            background: #007bff;
+            background: var(--accent-color);
             color: white;
             cursor: pointer;
+            font-size: 0.9rem;
             transition: background 0.2s;
         }
-        button:hover {
-            background: #0056b3;
+        
+        .action-button:hover {
+            background: #357ABD;
         }
+        
+        .action-button:active {
+            background: #2563EB;
+        }
+        
+        .action-button.secondary {
+            background: var(--secondary-color);
+        }
+        
+        .action-button.secondary:hover {
+            background: #64748B;
+        }
+        
         .qr-code {
             text-align: center;
             margin: 20px 0;
         }
+        
         .qr-code img {
             max-width: 200px;
             height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .stats {
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
+        
         .toast {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background: #333;
-            color: white;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.75rem 1.5rem;
             border-radius: 4px;
-            display: none;
-            animation: fadeIn 0.3s;
+            background: var(--primary-color);
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        .footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            padding-top: 1rem;
+            border-top: 1px solid #E2E8F0;
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .ad-sidebar {
+                position: static;
+                margin-top: 2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <textarea id="content" placeholder="Type or paste text here...">{{ content }}</textarea>
-        
-        <div class="buttons">
-            <button onclick="copyToClipboard()">Copy</button>
-            <button onclick="clearContent()">Clear</button>
-            <button onclick="window.location.href='/debug'">Debug</button>
-        </div>
-        
-        <div class="qr-code">
-            <img src="/qr" alt="QR Code" id="qr-code">
-            <p>Scan to share with your phone</p>
-        </div>
-        
+    <div class="header">
+        <a href="/" class="logo">
+            <span class="logo-icon">✨</span>
+            Magic Mirror
+        </a>
+        <p class="tagline">Share text magically between devices</p>
         <div class="stats">
-            <p>Views: {{ analytics.views }} | Unique Users: {{ analytics.unique_users }}</p>
-            <p>Today: {{ analytics.daily_views }} views, {{ analytics.daily_users }} users</p>
+            <span title="Views">👁️ {{ analytics.views }}</span>
+            <span title="Unique Users">👤 {{ analytics.unique_users }}</span>
+            <span title="Daily Views">📅 {{ analytics.daily_views }}</span>
         </div>
     </div>
-    
+
+    <div class="main-container">
+        <div class="editor-container">
+            <textarea id="content" placeholder="Type or paste your content here... It will automatically sync with other devices on your network">{{ content }}</textarea>
+            <div class="button-group">
+                <button class="action-button" onclick="copyToClipboard()" title="Copy to clipboard">
+                    📋 Copy
+                </button>
+                <button class="action-button secondary" onclick="clearContent()" title="Clear content">
+                    🗑️ Clear
+                </button>
+                <button class="action-button" onclick="window.location.href='/debug'" title="View debug info">
+                    🔧 Debug
+                </button>
+            </div>
+            
+            <div class="qr-code">
+                <img src="/qr" alt="QR Code" id="qr-code">
+                <p>Scan to share with your phone</p>
+            </div>
+        </div>
+        
+        <div class="ad-sidebar">
+            <div class="ad-container">
+                <script>
+                    var cpmstar_rnd = Math.round(Math.random()*999999);
+                    var cpmstar_pid = 35452;
+                    document.writeln("<SCR"+"IPT language='Javascript' src='//server.cpmstar.com/view.aspx?poolid="+cpmstar_pid+"&script=1&rnd="+cpmstar_rnd+"'></SCR"+"IPT>");
+                </script>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Magic Mirror - Share text magically</p>
+    </div>
+
     <div id="toast" class="toast"></div>
-    
+
     <script>
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
-            toast.style.display = 'block';
+            toast.classList.add('show');
             setTimeout(() => {
-                toast.style.display = 'none';
+                toast.classList.remove('show');
             }, 3000);
         }
         
@@ -116,12 +283,14 @@
             const textarea = document.getElementById('content');
             textarea.select();
             document.execCommand('copy');
-            showToast('Copied to clipboard ');
+            showToast('Copied to clipboard! 📋');
         }
         
         function clearContent() {
-            document.getElementById('content').value = '';
-            showToast('Content cleared ');
+            if (confirm('Are you sure you want to clear the content?')) {
+                document.getElementById('content').value = '';
+                showToast('Content cleared! 🗑️');
+            }
         }
         
         function generateQR() {
@@ -136,12 +305,12 @@
             
             ws.onopen = () => {
                 console.log('Connected to server');
-                showToast('Connected ');
+                showToast('Connected to room ✓');
             };
             
             ws.onclose = () => {
                 console.log('Disconnected from server');
-                showToast('Disconnected ');
+                showToast('Disconnected from room ✗');
                 setTimeout(initEditor, 1000);  // Try to reconnect
             };
             
