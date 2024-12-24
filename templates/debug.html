@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Mirror - Debug Info</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #2D3748;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            margin-top: 0;
+            color: #2D3748;
+            border-bottom: 2px solid #E2E8F0;
+            padding-bottom: 10px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section h2 {
+            color: #4A5568;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: #F7FAFC;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #E2E8F0;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            color: #4A5568;
+            font-size: 0.9rem;
+        }
+        
+        .stat-card p {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2D3748;
+        }
+        
+        .log-container {
+            background: #2D3748;
+            color: #E2E8F0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        
+        .log-container pre {
+            margin: 0;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #4A5568;
+            font-size: 0.9rem;
+            border-top: 1px solid #E2E8F0;
+            padding-top: 20px;
+        }
+        
+        .footer a {
+            color: #4299E1;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Debug Information</h1>
+        
+        <div class="section">
+            <h2>System Status</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Python Version</h3>
+                    <p>{{ debug_info.system_info.python_version.split()[0] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Platform</h3>
+                    <p>{{ debug_info.system_info.platform }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Server Time</h3>
+                    <p>{{ debug_info.system_info.time }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Analytics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Views</h3>
+                    <p>{{ analytics.views }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Online Devices</h3>
+                    <p>{{ analytics.online_devices }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Today's Views</h3>
+                    <p>{{ analytics.daily_views }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Active Connections</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Active Connections</h3>
+                    <p>{{ debug_info.active_connections.total }}</p>
+                </div>
+            </div>
+            <div class="log-container">
+                <pre>Active IPs:
+{% for ip, count in debug_info.active_connections.by_ip.items() %}{{ ip }}: {{ count }} connection(s)
+{% endfor %}</pre>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Recent Logs</h2>
+            <div class="log-container">
+                <pre>{% for log in recent_logs %}{{ log }}{% endfor %}</pre>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <a href="/">Home</a> • 
+                <a href="/about">About</a> • 
+                <a href="https://github.com/harmonyinfotech/mirror">GitHub</a>
+            </p>
+            <p>Magic Mirror v{{ version }} - Debug Information</p>
+        </div>
+    </div>
+</body>
+</html>
