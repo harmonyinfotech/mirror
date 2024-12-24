@@ -165,11 +165,8 @@ def get_client_ip():
 @app.before_request
 def before_request():
     """Update analytics before each request"""
-    try:
-        if not request.path.startswith(('/static/', '/favicon.ico')):
-            update_analytics(get_client_ip())
-    except Exception as e:
-        logger.error(f"Error in before_request: {str(e)}")
+    if request.endpoint and request.endpoint in ['index', 'about', 'debug']:  # Only count actual page views
+        update_analytics(get_client_ip())
 
 @app.route('/')
 def index():
